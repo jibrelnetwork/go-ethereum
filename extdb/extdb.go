@@ -21,8 +21,8 @@ type ExtDB interface {
     
     WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header)     error
     WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body)           error
-    // WriteTxs(blockHash common.Hash, transactions types.Transactions)                      error
-    // WriteTxRecipes(blockHash common.Hash, receipts types.Receipts)                        error
+    WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions)                      error
+    WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts)                        error
     // WriteTxLogs(blockHash common.Hash, logs []*types.Log)                                 error
     // WriteUncles(blockHash common.Hash, uncles []*types.Header)                            error
 
@@ -94,6 +94,32 @@ func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, b
 }
 
 
+func (self *ExtDBpg) WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions) error {
+    var query = "INSERT INTO transactions (block_hash, block_number, tx_hash, index, fields) VALUES ($1, $2, $3, $4, $5)"
+    for i, tx := range transactions {
+        fieldsString, err := self.SerializeTransactionFields(tx)
+        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, tx.Hash().Hex(), i, fieldsString)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts) error {
+    var query = "INSERT INTO receipts (block_hash, block_number, tx_hash, index, fields) VALUES ($1, $2, $3, $4, $5)"
+    for i, receipt := range receipts {
+        fieldsString, err := self.SerializeReceiptFields(receipt)
+        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, receipt.TxHash.Hex(), i, fieldsString)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+
 func (self *ExtDBpg) SerializeHeaderFields(header *types.Header) (string, error) {
     b, err := json.Marshal(header)
     // b, err := header.MarshalJSON()
@@ -107,6 +133,18 @@ func (self *ExtDBpg) SerializeBodyFields(body *types.Body) (string, error) {
 }
 
 
+func (self *ExtDBpg) SerializeReceiptFields(receipt *types.Receipt) (string, error) {
+    b, err := json.Marshal(receipt)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeTransactionFields(transaction *types.Transaction) (string, error) {
+    b, err := json.Marshal(transaction)
+    return string(b), err
+}
+
+
 func WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
     return db.WriteBlockHeader(blockHash, blockNumber, header)
 }
@@ -114,4 +152,14 @@ func WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.H
 
 func WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body) error {
     return db.WriteBlockBody(blockHash, blockNumber, body)
+}
+
+
+func WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions) error {
+    return db.WriteTransactions(blockHash, blockNumber, transactions)
+}
+
+
+func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts) error {
+    return db.WriteReceipts(blockHash, blockNumber, receipts)
 }
