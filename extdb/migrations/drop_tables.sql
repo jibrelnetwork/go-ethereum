@@ -1,4 +1,4 @@
-DROP TABLE block_headers;
-DROP TABLE block_bodies;
-DROP TABLE transactions;
+DROP TABLE headers;
+DROP TABLE blocks;
+-- DROP TABLE transactions;
 DROP TABLE receipts;

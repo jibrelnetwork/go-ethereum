@@ -405,10 +405,6 @@ func WriteBody(db ethdb.Putter, hash common.Hash, number uint64, body *types.Bod
 		log.Crit("Failed to store body in extern db", "err", err)
 	}
 
-	if err := extdb.WriteTransactions(hash, number, body.Transactions); err != nil {
-		log.Crit("Failed to store transactions in extern db", "err", err)
-	}
-
 	data, err := rlp.EncodeToBytes(body)
 	if err != nil {
 		return err
