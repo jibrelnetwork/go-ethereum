@@ -28,3 +28,15 @@ CREATE TABLE receipts (
     UNIQUE(block_hash, index)
 );
 
+
+CREATE TABLE accounts (
+    block_number bigint UNIQUE,
+    block_hash varchar UNIQUE,
+    address varchar,
+    fields jsonb,
+    UNIQUE(block_number, address),
+    UNIQUE(block_hash, address)
+);
+
+CREATE INDEX ON accounts(address);
+

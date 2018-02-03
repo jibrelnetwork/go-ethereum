@@ -10,7 +10,6 @@ import (
     "github.com/ethereum/go-ethereum/common"
     "github.com/ethereum/go-ethereum/log"
     "github.com/ethereum/go-ethereum/core/types"
-    "github.com/ethereum/go-ethereum/core/state"
     "gopkg.in/urfave/cli.v1"
 )
 
@@ -25,7 +24,7 @@ type ExtDB interface {
     WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body)           error
     // WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions)                      error
     WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts)                        error
-    WriteSateObject(blockHash common.Hash, blockNumber uint64, stateObj state.stateObject) error
+    WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
     // WriteTxLogs(blockHash common.Hash, logs []*types.Log)                                 error
     // WriteUncles(blockHash common.Hash, uncles []*types.Header)                            error
 
@@ -126,12 +125,10 @@ func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, re
 }
 
 
-func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64, obj state.stateObject) error {
+func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error {
     var query = "INSERT INTO accounts (block_hash, block_number, address, fields) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
-    for i, receipt := range receipts {
-        fieldsString, err := self.SerializeReceiptFields(receipt)
-    }
-    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, obj.address.Hex(), fieldsString)
+    fieldsString, err := self.SerializeStateObjectFields(obj)
+    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, addr.Hex(), fieldsString)
     if err != nil {
         return err
     }
@@ -154,6 +151,11 @@ func (self *ExtDBpg) SerializeBodyFields(body *types.Body) (string, error) {
 
 func (self *ExtDBpg) SerializeReceiptFields(receipt *types.Receipt) (string, error) {
     b, err := json.Marshal(receipt)
+    return string(b), err
+}
+
+func (self *ExtDBpg) SerializeStateObjectFields(dumpAccount interface{}) (string, error) {
+    b, err := json.Marshal(dumpAccount)
     return string(b), err
 }
 
@@ -193,49 +195,23 @@ func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Rec
 }
 
 
-func WriteSateObjects(blockHash common.Hash, blockNumber uint64, state state.StateDB) error {
+func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address, dumpAccount interface{}) error {
 
     if db != nil{
-        for addr, stateObject := range state.stateObjects {
-            if err := db.WriteStateObject(blockHash, blockNumber, stateObject); err != nil {
-                return err
-            }
+        if err := db.WriteStateObject(blockHash, blockNumber, address, dumpAccount); err != nil {
+            return err
+        }
     }
     return nil
+
 }
 
-// // CommitTo writes the state to the given database.
-// func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (root common.Hash, err error) {
-//     defer s.clearJournalAndRefund()
 
-//     // Commit objects to the trie.
-//     for addr, stateObject := range s.stateObjects {
-//         _, isDirty := s.stateObjectsDirty[addr]
-//         log.Info("STO", "Addr", addr, "Hash", stateObject.addrHash, "Data", stateObject.data)
-//         switch {
-//         case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
-//             // If the object has been removed, don't bother syncing it
-//             // and just mark it for deletion in the trie.
-//             s.deleteStateObject(stateObject)
-//         case isDirty:
-//             // Write any contract code associated with the state object
-//             if stateObject.code != nil && stateObject.dirtyCode {
-//                 if err := dbw.Put(stateObject.CodeHash(), stateObject.code); err != nil {
-//                     return common.Hash{}, err
-//                 }
-//                 stateObject.dirtyCode = false
-//             }
-//             // Write any storage changes in the state object to its storage trie.
-//             if err := stateObject.CommitTrie(s.db, dbw); err != nil {
-//                 return common.Hash{}, err
-//             }
-//             // Update the object in the main account trie.
-//             s.updateStateObject(stateObject)
-//         }
-//         delete(s.stateObjectsDirty, addr)
-//     }
-//     // Write trie changes.
-//     root, err = s.trie.CommitTo(dbw)
-//     log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
-//     return root, err
-// }
+func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address) error {
+
+    if db != nil{
+        log.Info("Stubbed delete state object in ext db", "Addr", address.Hex())
+    }
+    return nil
+
+}

@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/extdb"
 )
 
 type revision struct {
@@ -575,7 +576,6 @@ func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (ro
 	// Commit objects to the trie.
 	for addr, stateObject := range s.stateObjects {
 		_, isDirty := s.stateObjectsDirty[addr]
-		log.Info("STO", "Addr", addr, "Hash", stateObject.addrHash, "Data", stateObject.data)
 		switch {
 		case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
 			// If the object has been removed, don't bother syncing it
@@ -602,4 +602,28 @@ func (s *StateDB) CommitTo(dbw trie.DatabaseWriter, deleteEmptyObjects bool) (ro
 	root, err = s.trie.CommitTo(dbw)
 	log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
 	return root, err
+}
+
+
+// CommitToExtDb writes the state to the extern database.
+func (s *StateDB) CommitToExtDb(block *types.Block)  error {
+
+	// Commit objects to the extern db.
+	for addr, stateObject := range s.stateObjects {
+		_, isDirty := s.stateObjectsDirty[addr]
+		log.Info("ExtDB Write state", "Addr", addr, "Block", block.Number().Uint64())
+		switch {
+		case stateObject.suicided:
+			if err := extdb.DeleteStateObject(block.Hash(), block.Number().Uint64(), addr); err != nil {
+				return err
+			}
+		case isDirty:
+			dumpAccount, _ := s.RawDumpStateObject(stateObject)
+			if err := extdb.WriteStateObject(block.Hash(), block.Number().Uint64(), addr, dumpAccount); err != nil {
+				return err
+			}
+		}
+	}
+	// Write trie changes.
+	return nil
 }
