@@ -80,12 +80,13 @@ func (self *StateDB) Dump() []byte {
 	return json
 }
 
-func (self *StateDB) DumpStateObject(obj stateObject) []byte, error {
+
+func (self *StateDB) RawDumpStateObject(obj *stateObject) (DumpAccount, error) {
 	account := DumpAccount{
-		Balance:  data.Balance.String(),
-		Nonce:    data.Nonce,
-		Root:     common.Bytes2Hex(data.Root[:]),
-		CodeHash: common.Bytes2Hex(data.CodeHash),
+		Balance:  obj.data.Balance.String(),
+		Nonce:    obj.data.Nonce,
+		Root:     common.Bytes2Hex(obj.data.Root[:]),
+		CodeHash: common.Bytes2Hex(obj.data.CodeHash),
 		Code:     common.Bytes2Hex(obj.Code(self.db)),
 		Storage:  make(map[string]string),
 	}
@@ -93,11 +94,11 @@ func (self *StateDB) DumpStateObject(obj stateObject) []byte, error {
 	for storageIt.Next() {
 		account.Storage[common.Bytes2Hex(self.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(storageIt.Value)
 	}
-	json, err := json.MarshalIndent(account, "", "    ")
-	if err != nil {
-		fmt.Println("obj dump err", err)
-		return nil, err
-	}
+	// json, err := json.MarshalIndent(account, "", "    ")
+	// if err != nil {
+	// 	fmt.Println("obj dump err", err)
+	// 	return nil, err
+	// }
 
-	return json, nil
+	return account, nil
 }
