@@ -1,0 +1,167 @@
+package extdb
+
+import (
+    "database/sql"
+    "encoding/json"
+    "regexp"
+
+    _ "github.com/lib/pq"
+    "github.com/ethereum/go-ethereum/common"
+    "github.com/ethereum/go-ethereum/log"
+    "github.com/ethereum/go-ethereum/core/types"
+)
+
+
+type ExtDBpg struct {
+    conn    * sql.DB
+}
+
+
+func NewExtDBpg(dbURI string) error {
+    dbpg := &ExtDBpg{
+        conn: nil,
+    }
+    db = dbpg
+    return dbpg.Connect(dbURI)
+}
+
+
+func (self *ExtDBpg) Connect(dbURI string) error {
+    conn, err := sql.Open("postgres", dbURI)
+    self.conn = conn
+    if err != nil {
+        log.Crit("Error when connect to extern DB", "Error", err)
+    } else {
+        re := regexp.MustCompile("(//.*:)(.*)(@)")
+        log.Info("Connected to extern DB", "URI", re.ReplaceAllString(dbURI, "$1****$3"))
+    }
+    return err
+}
+
+
+func (self *ExtDBpg) WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+    log.Info("ExtDB write block header", "hash", blockHash, "number", blockNumber)
+
+    fieldsString, err := self.SerializeHeaderFields(header)
+    var query = "INSERT INTO headers (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
+    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, fieldsString)
+    
+    if err != nil {
+        log.Warn("Error writing header to extern DB", "Error", err)
+    }
+    return err
+}
+
+
+func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body) error {
+    log.Info("ExtDB write block body", "hash", blockHash, "number", blockNumber)
+
+    err := WriteTransactions(blockHash, blockNumber, body.Transactions)
+    if err != nil {
+        log.Warn("Error writing Transactions to extern DB", "Error", err)
+    }
+    err = WriteUncles(blockHash, blockNumber, body.Uncles)
+    if err != nil {
+        log.Warn("Error writing Uncles to extern DB", "Error", err)
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) WriteTransaction(blockHash common.Hash, blockNumber uint64, index int, transaction *types.Transaction) error {
+    var query = `INSERT INTO transactions (block_hash, block_number, tx_hash, "index", fields)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (tx_hash) DO UPDATE
+                 SET block_number=excluded.block_number, block_hash=excluded.block_hash,
+                 "index"=excluded."index", fields=excluded.fields;`
+
+    fieldsString, err := self.SerializeTransactionFields(transaction)
+    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, transaction.Hash().Hex(), index, fieldsString)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions) error {
+    for i, tx := range transactions {
+        err := self.WriteTransaction(blockHash, blockNumber, i, tx)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) WriteUncles(blockHash common.Hash, blockNumber uint64, uncles []*types.Header) error {
+    var query = "INSERT INTO uncles (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
+    for _, uncle := range uncles {
+        fieldsString, err := self.SerializeUncleFields(uncle)
+        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, fieldsString)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts) error {
+    var query = "INSERT INTO receipts (block_hash, block_number, tx_hash, index, fields) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING"
+    for i, receipt := range receipts {
+        fieldsString, err := self.SerializeReceiptFields(receipt)
+        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, receipt.TxHash.Hex(), i, fieldsString)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error {
+    var query = "INSERT INTO accounts (block_hash, block_number, address, fields) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
+    fieldsString, err := self.SerializeStateObjectFields(obj)
+    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, addr.Hex(), fieldsString)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+
+func (self *ExtDBpg) SerializeHeaderFields(header *types.Header) (string, error) {
+    b, err := json.Marshal(header)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeBodyFields(body *types.Body) (string, error) {
+    b, err := json.Marshal(body)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeReceiptFields(receipt *types.Receipt) (string, error) {
+    b, err := json.Marshal(receipt)
+    return string(b), err
+}
+
+func (self *ExtDBpg) SerializeStateObjectFields(dumpAccount interface{}) (string, error) {
+    b, err := json.Marshal(dumpAccount)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeTransactionFields(transaction *types.Transaction) (string, error) {
+    b, err := json.Marshal(transaction)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeUncleFields(uncle *types.Header) (string, error) {
+    b, err := json.Marshal(uncle)
+    return string(b), err
+}

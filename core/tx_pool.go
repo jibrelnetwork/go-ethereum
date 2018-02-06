@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
+	"github.com/ethereum/go-ethereum/extdb"
 )
 
 const (
@@ -654,6 +655,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 
 		log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
 
+		extdb.WriteTransaction(common.Hash{}, 0, 0, tx);
 		// We've directly injected a replacement transaction, notify subsystems
 		go pool.txFeed.Send(TxPreEvent{tx})
 
@@ -747,6 +749,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	pool.beats[addr] = time.Now()
 	pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 
+	extdb.WriteTransaction(common.Hash{}, 0, 0, tx);
 	go pool.txFeed.Send(TxPreEvent{tx})
 }
 
