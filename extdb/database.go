@@ -147,6 +147,19 @@ func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, add
 }
 
 
+func (self *ExtDBpg) WriteInternalTransaction(blockNumber uint64, timeStamp uint64, transactionType string, intTransaction *exttypes.InternalTransaction) error {
+    var query = `INSERT INTO internaltransactions (block_number, timestamp, type, fields)
+                 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;`
+
+    fieldsString, err := self.SerializeInternalTransactionFields(intTransaction)
+    _, err = self.conn.Exec(query, blockNumber, timeStamp, transactionType, fieldsString)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+
 func (self *ExtDBpg) SerializeHeaderFields(header *types.Header) (string, error) {
     b, err := json.Marshal(header)
     return string(b), err
@@ -184,5 +197,11 @@ func (self *ExtDBpg) SerializeUncleFields(uncle *types.Header) (string, error) {
 
 func (self *ExtDBpg) SerializeBlockRewardsFields(blockReward *exttypes.BlockReward) (string, error) {
     b, err := json.Marshal(blockReward)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeInternalTransactionFields(intTransaction *exttypes.InternalTransaction) (string, error) {
+    b, err := json.Marshal(intTransaction)
     return string(b), err
 }
