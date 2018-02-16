@@ -9,6 +9,7 @@ import (
     "github.com/ethereum/go-ethereum/common"
     "github.com/ethereum/go-ethereum/log"
     "github.com/ethereum/go-ethereum/core/types"
+    "github.com/ethereum/go-ethereum/extdb/exttypes"
 )
 
 
@@ -135,6 +136,17 @@ func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64,
 }
 
 
+func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error {
+    var query = "INSERT INTO rewards (block_hash, block_number, address, fields) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
+    fieldsString, err := self.SerializeStateObjectFields(blockReward)
+    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, addr.Hex(), fieldsString)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+
 func (self *ExtDBpg) SerializeHeaderFields(header *types.Header) (string, error) {
     b, err := json.Marshal(header)
     return string(b), err
@@ -166,5 +178,11 @@ func (self *ExtDBpg) SerializeTransactionFields(transaction *types.Transaction) 
 
 func (self *ExtDBpg) SerializeUncleFields(uncle *types.Header) (string, error) {
     b, err := json.Marshal(uncle)
+    return string(b), err
+}
+
+
+func (self *ExtDBpg) SerializeBlockRewardsFields(blockReward *exttypes.BlockReward) (string, error) {
+    b, err := json.Marshal(blockReward)
     return string(b), err
 }

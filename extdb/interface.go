@@ -4,6 +4,7 @@ import (
     "github.com/ethereum/go-ethereum/common"
     "github.com/ethereum/go-ethereum/log"
     "github.com/ethereum/go-ethereum/core/types"
+    "github.com/ethereum/go-ethereum/extdb/exttypes"
     "gopkg.in/urfave/cli.v1"
 )
 
@@ -19,6 +20,7 @@ type ExtDB interface {
     WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions)     error
     WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts)     error
     WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
+    WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
 }
 
 
@@ -87,7 +89,6 @@ func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.
         }
     }
     return nil
-
 }
 
 
@@ -97,4 +98,13 @@ func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common
     }
     return nil
 
+}
+
+func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Address, blockReward *exttypes.BlockReward) error {
+    if db != nil{
+        if err := db.WriteRewards(blockHash, blockNumber, address, blockReward); err != nil {
+            return err
+        }
+    }
+    return nil
 }
