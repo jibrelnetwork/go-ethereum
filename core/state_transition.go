@@ -25,6 +25,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 )
 
 var (
@@ -232,6 +234,18 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(sender.Address(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = evm.Call(sender, st.to().Address(), st.data, st.gas, st.value)
+
+		intTransactionFrom := sender.Address()
+		intTransactionTo := st.to().Address()
+		intTransaction := new(exttypes.InternalTransaction)
+		intTransaction.BlockNumber = st.evm.BlockNumber
+		intTransaction.TimeStamp   = st.evm.Time
+		intTransaction.From        = &intTransactionFrom
+		intTransaction.To          = &intTransactionTo
+		intTransaction.Value       = st.value
+		intTransaction.GasLimit    = st.gas
+		intTransaction.Status      = ""
+		extdb.WriteInternalTransaction(intTransaction.BlockNumber.Uint64(), intTransaction.TimeStamp.Uint64(), "call", intTransaction)
 	}
 	if vmerr != nil {
 		log.Debug("VM returned with error", "err", vmerr)

@@ -52,4 +52,12 @@ CREATE TABLE rewards (
     UNIQUE(block_hash, address)
 );
 
+CREATE TABLE internaltransactions (
+    block_number bigint,
+    type varchar,
+    timestamp bigint,
+    fields jsonb,
+    UNIQUE(block_number, timestamp),
+);
+
 CREATE INDEX ON accounts(address);
