@@ -19,8 +19,10 @@ CREATE TABLE transactions (
 );
 
 CREATE TABLE uncles (
-    block_number bigint UNIQUE,
-    block_hash varchar UNIQUE,
+    block_number bigint,
+    block_hash varchar,
+    uncle_hash varchar UNIQUE,
+    index integer,
     fields jsonb
 );
 
