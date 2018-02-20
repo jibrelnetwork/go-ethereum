@@ -96,10 +96,13 @@ func (self *ExtDBpg) WriteTransactions(blockHash common.Hash, blockNumber uint64
 
 
 func (self *ExtDBpg) WriteUncles(blockHash common.Hash, blockNumber uint64, uncles []*types.Header) error {
-    var query = "INSERT INTO uncles (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
-    for _, uncle := range uncles {
+    var query = `INSERT INTO uncles (block_hash, block_number, uncle_hash, "index", fields)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (uncle_hash) DO NOTHING`
+                 
+    for i, uncle := range uncles {
         fieldsString, err := self.SerializeUncleFields(uncle)
-        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, fieldsString)
+        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, uncle.Hash().Hex(), i, fieldsString)
         if err != nil {
             return err
         }
