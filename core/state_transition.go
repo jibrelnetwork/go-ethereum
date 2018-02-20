@@ -244,8 +244,13 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		intTransaction.To          = &intTransactionTo
 		intTransaction.Value       = st.value
 		intTransaction.GasLimit    = st.gas
-		intTransaction.Status      = ""
+		if vmerr != nil {
+			intTransaction.Status = vmerr.Error()
+		} else {
+			intTransaction.Status = "success"
+		}
 		extdb.WriteInternalTransaction(intTransaction.BlockNumber.Uint64(), intTransaction.TimeStamp.Uint64(), "call", intTransaction)
+		
 	}
 	if vmerr != nil {
 		log.Debug("VM returned with error", "err", vmerr)
