@@ -87,6 +87,10 @@ func (ethash *Ethash) VerifyHeader(chain consensus.ChainReader, header *types.He
 	return ethash.verifyHeader(chain, header, parent, false, seal)
 }
 
+func (ethash *Ethash) VerifyHeader2(chain consensus.ChainReader, header *types.Header, parent *types.Header, uncle bool, seal bool) error {
+	return ethash.verifyHeader(chain, header, parent, false, seal)
+}
+
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications.
@@ -566,6 +570,7 @@ func AccumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		if !saveOnly {
 			reward.Add(reward, r)
 		} else {
+			uRewards[i] = new(exttypes.UncleReward)
 			uRewards[i].Miner = uncle.Coinbase
 			uRewards[i].UnclePosition = i
 			uRewards[i].BlockReward = r
