@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 )
 
 // DatabaseReader wraps the Get method of a backing data store.
@@ -451,7 +452,7 @@ func WriteBlock(db ethdb.Putter, block *types.Block) error {
 // as a single receipt slice. This is used during chain reorganisations for
 // rescheduling dropped transactions.
 func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receipts types.Receipts) error {
-	if err := extdb.WriteReceipts(hash, number, receipts); err != nil {
+	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
 		log.Crit("Failed to store transaction receipts in extern db", "err", err)
 	}
 	// Convert the receipts into their storage form and serialize them
