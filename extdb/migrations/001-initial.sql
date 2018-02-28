@@ -4,23 +4,15 @@ CREATE TABLE headers (
     fields jsonb
 );
 
-CREATE TABLE blocks (
+CREATE TABLE bodies (
     block_number bigint UNIQUE,
     block_hash varchar UNIQUE,
     fields jsonb
 );
 
-CREATE TABLE transactions (
-    block_number bigint,
-    block_hash varchar,
+CREATE TABLE pending_transactions (
     tx_hash varchar UNIQUE,
-    index integer,
-    fields jsonb
-);
-
-CREATE TABLE uncles (
-    block_number bigint UNIQUE,
-    block_hash varchar UNIQUE,
+    status varchar,
     fields jsonb
 );
 
@@ -52,12 +44,12 @@ CREATE TABLE rewards (
     UNIQUE(block_hash, address)
 );
 
-CREATE TABLE internaltransactions (
+CREATE TABLE internal_transactions (
     block_number bigint,
     type varchar,
     timestamp bigint,
     fields jsonb,
-    UNIQUE(block_number, timestamp),
+    UNIQUE(block_number, timestamp)
 );
 
 CREATE INDEX ON accounts(address);
