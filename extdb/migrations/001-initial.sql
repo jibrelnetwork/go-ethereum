@@ -17,18 +17,14 @@ CREATE TABLE pending_transactions (
 );
 
 CREATE TABLE receipts (
-    block_number bigint,
-    block_hash varchar,
-    tx_hash varchar,
-    index integer,
-    fields jsonb,
-    UNIQUE(block_number, index),
-    UNIQUE(block_hash, index)
+    block_number bigint UNIQUE,
+    block_hash varchar UNIQUE,
+    fields jsonb
 );
 
 CREATE TABLE accounts (
-    block_number bigint UNIQUE,
-    block_hash varchar UNIQUE,
+    block_number bigint,
+    block_hash varchar,
     address varchar,
     fields jsonb,
     UNIQUE(block_number, address),

@@ -88,14 +88,15 @@ func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *ty
 }
 
 
-func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts) error {
-    var query = "INSERT INTO receipts (block_hash, block_number, tx_hash, index, fields) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING"
-    for i, receipt := range receipts {
-        fieldsString, err := self.SerializeReceiptFields(receipt)
-        _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, receipt.TxHash.Hex(), i, fieldsString)
-        if err != nil {
-            return err
-        }
+func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts *exttypes.ReceiptsContainer) error {
+    var query = "INSERT INTO receipts (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
+    fieldsString, err := self.SerializeReceiptsFields(receipts)
+    if err != nil {
+        return err
+    }
+    _, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, fieldsString)
+    if err != nil {
+        return err
     }
     return nil
 }
@@ -148,10 +149,11 @@ func (self *ExtDBpg) SerializeBodyFields(body *types.Body) (string, error) {
 }
 
 
-func (self *ExtDBpg) SerializeReceiptFields(receipt *types.Receipt) (string, error) {
-    b, err := json.Marshal(receipt)
+func (self *ExtDBpg) SerializeReceiptsFields(receipts *exttypes.ReceiptsContainer) (string, error) {
+    b, err := json.Marshal(receipts)
     return string(b), err
 }
+
 
 func (self *ExtDBpg) SerializeStateObjectFields(dumpAccount interface{}) (string, error) {
     b, err := json.Marshal(dumpAccount)

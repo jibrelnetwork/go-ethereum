@@ -16,7 +16,7 @@ type ExtDB interface {
     WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header)     error
     WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body)           error
     WritePendingTransaction(txHash common.Hash, transaction *types.Transaction)           error
-    WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts)     error
+    WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts *exttypes.ReceiptsContainer)     error
     WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
     WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
     WriteInternalTransaction(blockNumber uint64, timeStamp uint64, transactionType string, intTransaction *exttypes.InternalTransaction) error
@@ -65,7 +65,7 @@ func WritePendingTransaction(txHash common.Hash, transaction *types.Transaction)
 }
 
 
-func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts) error {
+func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts *exttypes.ReceiptsContainer) error {
     if db != nil {
         return db.WriteReceipts(blockHash, blockNumber, receipts)
     }
