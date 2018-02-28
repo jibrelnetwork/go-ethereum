@@ -12,12 +12,10 @@ import (
 type ExtDB interface {
 
     Connect(dbURI string)                                                                 error
-    
+    Close()                                                                               error
     WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header)     error
     WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body)           error
-    WriteUncles(blockHash common.Hash, blockNumber uint64, uncles []*types.Header)        error
-    WriteTransaction(blockHash common.Hash, blockNumber uint64, index int, transaction *types.Transaction) error
-    WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions)     error
+    WritePendingTransaction(txHash common.Hash, transaction *types.Transaction)           error
     WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts)     error
     WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
     WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
@@ -25,18 +23,26 @@ type ExtDB interface {
 }
 
 
-var (	
-	ExtDbUriFlag = cli.StringFlag{
+var (
+    ExtDbUriFlag = cli.StringFlag{
         Name:  "extdb",
         Usage: "Extern DB connection string",
     }
 
-	db ExtDB
+    db ExtDB
 )
 
 
+func Close() error {
+    if db != nil {
+        return db.Close()
+    }
+    return nil
+}
+
+
 func WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
-    if db != nil{
+    if db != nil {
         return db.WriteBlockHeader(blockHash, blockNumber, header)
     }
     return nil
@@ -44,39 +50,23 @@ func WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.H
 
 
 func WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body) error {
-    if db != nil{
+    if db != nil {
         return db.WriteBlockBody(blockHash, blockNumber, body)
     }
     return nil
 }
 
 
-func WriteTransaction(blockHash common.Hash, blockNumber uint64, index int, transaction *types.Transaction) error {
-    if db != nil{
-        return db.WriteTransaction(blockHash, blockNumber, index, transaction)
-    }
-    return nil
-}
-
-
-func WriteTransactions(blockHash common.Hash, blockNumber uint64, transactions types.Transactions) error {
-    if db != nil{
-        return db.WriteTransactions(blockHash, blockNumber, transactions)
-    }
-    return nil
-}
-
-
-func WriteUncles(blockHash common.Hash, blockNumber uint64, uncles []*types.Header) error {
-    if db != nil{
-        return db.WriteUncles(blockHash, blockNumber, uncles)
+func WritePendingTransaction(txHash common.Hash, transaction *types.Transaction) error {
+    if db != nil {
+        return db.WritePendingTransaction(txHash, transaction)
     }
     return nil
 }
 
 
 func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Receipts) error {
-    if db != nil{
+    if db != nil {
         return db.WriteReceipts(blockHash, blockNumber, receipts)
     }
     return nil
@@ -84,7 +74,7 @@ func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts types.Rec
 
 
 func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address, dumpAccount interface{}) error {
-    if db != nil{
+    if db != nil {
         if err := db.WriteStateObject(blockHash, blockNumber, address, dumpAccount); err != nil {
             return err
         }
@@ -94,7 +84,7 @@ func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.
 
 
 func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address) error {
-    if db != nil{
+    if db != nil {
         log.Info("Stubbed delete state object in ext db", "Addr", address.Hex())
     }
     return nil
@@ -103,7 +93,7 @@ func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common
 
 
 func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Address, blockReward *exttypes.BlockReward) error {
-    if db != nil{
+    if db != nil {
         if err := db.WriteRewards(blockHash, blockNumber, address, blockReward); err != nil {
             return err
         }
@@ -113,7 +103,7 @@ func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Addr
 
 
 func WriteInternalTransaction(blockNumber uint64, timeStamp uint64, transactionType string, intTransaction *exttypes.InternalTransaction) error {
-    if db != nil{
+    if db != nil {
         if err := db.WriteInternalTransaction(blockNumber, timeStamp, transactionType, intTransaction); err != nil {
             return err
         }
