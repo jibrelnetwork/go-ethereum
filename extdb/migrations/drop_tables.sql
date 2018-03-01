@@ -1,8 +1,7 @@
 DROP TABLE headers;
-DROP TABLE blocks;
-DROP TABLE transactions;
-DROP TABLE uncles;
+DROP TABLE bodies;
 DROP TABLE receipts;
 DROP TABLE accounts;
 DROP TABLE rewards;
-DROP TABLE internaltransactions;
+DROP TABLE internal_transactions;
+DROP TABLE pending_transactions;

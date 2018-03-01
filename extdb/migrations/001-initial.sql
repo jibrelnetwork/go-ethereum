@@ -32,8 +32,8 @@ CREATE TABLE accounts (
 );
 
 CREATE TABLE rewards (
-    block_number bigint UNIQUE,
-    block_hash varchar UNIQUE,
+    block_number bigint,
+    block_hash varchar,
     address varchar,
     fields jsonb,
     UNIQUE(block_number, address),
@@ -49,3 +49,11 @@ CREATE TABLE internal_transactions (
 );
 
 CREATE INDEX ON accounts(address);
+
+CREATE INDEX ON rewards(address);
+
+CREATE INDEX ON pending_transactions(status);
+
+CREATE INDEX ON internal_transactions(type);
+
+CREATE INDEX ON internal_transactions(block_number);
