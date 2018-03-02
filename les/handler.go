@@ -260,8 +260,7 @@ func (pm *ProtocolManager) newPeer(pv int, nv uint64, p *p2p.Peer, rw p2p.MsgRea
 // handle is the callback invoked to manage the life cycle of a les peer. When
 // this function terminates, the peer is disconnected.
 func (pm *ProtocolManager) handle(p *peer) error {
-	// Ignore maxPeers if this is a trusted peer
-	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
+	if pm.peers.Len() >= pm.maxPeers {
 		return p2p.DiscTooManyPeers
 	}
 
@@ -791,9 +790,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				break
 			}
 		}
+		proofs := nodes.NodeList()
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
-		return p.SendProofsV2(req.ReqID, bv, nodes.NodeList())
+		return p.SendProofsV2(req.ReqID, bv, proofs)
 
 	case ProofsV1Msg:
 		if pm.odr == nil {
@@ -856,12 +856,15 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if reject(uint64(reqCnt), MaxHelperTrieProofsFetch) {
 			return errResp(ErrRequestRejected, "")
 		}
-		trieDb := trie.NewDatabase(ethdb.NewTable(pm.chainDb, light.ChtTablePrefix))
 		for _, req := range req.Reqs {
 			if header := pm.blockchain.GetHeaderByNumber(req.BlockNum); header != nil {
-				sectionHead := core.GetCanonicalHash(pm.chainDb, req.ChtNum*light.CHTFrequencyServer-1)
+				sectionHead := core.GetCanonicalHash(pm.chainDb, req.ChtNum*light.ChtV1Frequency-1)
 				if root := light.GetChtRoot(pm.chainDb, req.ChtNum-1, sectionHead); root != (common.Hash{}) {
-					trie, err := trie.New(root, trieDb)
+					statedb, err := pm.blockchain.State()
+					if err != nil {
+						continue
+					}
+					trie, err := statedb.Database().OpenTrie(root)
 					if err != nil {
 						continue
 					}
@@ -875,6 +878,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 					if bytes += proof.DataSize() + estHeaderRlpSize; bytes >= softResponseLimit {
 						break
 					}
+
 				}
 			}
 		}
@@ -906,16 +910,20 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			lastIdx  uint64
 			lastType uint
 			root     common.Hash
-			auxTrie  *trie.Trie
+			statedb  *state.StateDB
+			trie     state.Trie
 		)
-		nodes := light.NewNodeSet()
-		for _, req := range req.Reqs {
-			if auxTrie == nil || req.Type != lastType || req.TrieIdx != lastIdx {
-				auxTrie, lastType, lastIdx = nil, req.Type, req.TrieIdx
 
-				var prefix string
-				if root, prefix = pm.getHelperTrie(req.Type, req.TrieIdx); root != (common.Hash{}) {
-					auxTrie, _ = trie.New(root, trie.NewDatabase(ethdb.NewTable(pm.chainDb, prefix)))
+		nodes := light.NewNodeSet()
+
+		for _, req := range req.Reqs {
+			if trie == nil || req.HelperTrieType != lastType || req.TrieIdx != lastIdx {
+				statedb, trie, lastType, lastIdx = nil, nil, req.HelperTrieType, req.TrieIdx
+
+				if root, _ = pm.getHelperTrie(req.HelperTrieType, req.TrieIdx); root != (common.Hash{}) {
+					if statedb, _ = pm.blockchain.State(); statedb != nil {
+						trie, _ = statedb.Database().OpenTrie(root)
+					}
 				}
 			}
 			if req.AuxReq == auxRoot {
@@ -926,8 +934,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				auxData = append(auxData, data)
 				auxBytes += len(data)
 			} else {
-				if auxTrie != nil {
-					auxTrie.Prove(req.Key, req.FromLevel, nodes)
+				if trie != nil {
+					trie.Prove(req.Key, req.FromLevel, nodes)
 				}
 				if req.AuxReq != 0 {
 					data := pm.getHelperTrieAuxData(req)
@@ -939,9 +947,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				break
 			}
 		}
+		proofs := nodes.NodeList()
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
-		return p.SendHelperTrieProofs(req.ReqID, bv, HelperTrieResps{Proofs: nodes.NodeList(), AuxData: auxData})
+		return p.SendHelperTrieProofs(req.ReqID, bv, HelperTrieResps{Proofs: proofs, AuxData: auxData})
 
 	case HeaderProofsMsg:
 		if pm.odr == nil {
@@ -1114,7 +1123,7 @@ func (pm *ProtocolManager) getAccount(statedb *state.StateDB, root, hash common.
 func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, string) {
 	switch id {
 	case htCanonical:
-		sectionHead := core.GetCanonicalHash(pm.chainDb, (idx+1)*light.CHTFrequencyClient-1)
+		sectionHead := core.GetCanonicalHash(pm.chainDb, (idx+1)*light.ChtFrequency-1)
 		return light.GetChtV2Root(pm.chainDb, idx, sectionHead), light.ChtTablePrefix
 	case htBloomBits:
 		sectionHead := core.GetCanonicalHash(pm.chainDb, (idx+1)*light.BloomTrieFrequency-1)
@@ -1125,8 +1134,10 @@ func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, stri
 
 // getHelperTrieAuxData returns requested auxiliary data for the given HelperTrie request
 func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
-	switch {
-	case req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8:
+	if req.HelperTrieType == htCanonical && req.AuxReq == auxHeader {
+		if len(req.Key) != 8 {
+			return nil
+		}
 		blockNum := binary.BigEndian.Uint64(req.Key)
 		hash := core.GetCanonicalHash(pm.chainDb, blockNum)
 		return core.GetHeaderRLP(pm.chainDb, hash, blockNum)

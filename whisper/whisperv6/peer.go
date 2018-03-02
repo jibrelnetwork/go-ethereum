@@ -19,7 +19,6 @@ package whisperv6
 import (
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,9 +36,7 @@ type Peer struct {
 
 	trusted        bool
 	powRequirement float64
-	bloomMu        sync.Mutex
-	bloomFilter    []byte
-	fullNode       bool
+	bloomFilter    []byte // may contain nil in case of full node
 
 	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
 
@@ -56,8 +53,6 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		powRequirement: 0.0,
 		known:          set.New(),
 		quit:           make(chan struct{}),
-		bloomFilter:    makeFullNodeBloom(),
-		fullNode:       true,
 	}
 }
 
@@ -123,7 +118,11 @@ func (peer *Peer) handshake() error {
 			if sz != bloomFilterSize && sz != 0 {
 				return fmt.Errorf("peer [%x] sent bad status message: wrong bloom filter size %d", peer.ID(), sz)
 			}
-			peer.setBloomFilter(bloom)
+			if isFullNode(bloom) {
+				peer.bloomFilter = nil
+			} else {
+				peer.bloomFilter = bloom
+			}
 		}
 	}
 
@@ -227,25 +226,10 @@ func (peer *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
 }
 
 func (peer *Peer) bloomMatch(env *Envelope) bool {
-	peer.bloomMu.Lock()
-	defer peer.bloomMu.Unlock()
-	return peer.fullNode || bloomFilterMatch(peer.bloomFilter, env.Bloom())
-}
-
-func (peer *Peer) setBloomFilter(bloom []byte) {
-	peer.bloomMu.Lock()
-	defer peer.bloomMu.Unlock()
-	peer.bloomFilter = bloom
-	peer.fullNode = isFullNode(bloom)
-	if peer.fullNode && peer.bloomFilter == nil {
-		peer.bloomFilter = makeFullNodeBloom()
+	if peer.bloomFilter == nil {
+		// no filter - full node, accepts all envelops
+		return true
 	}
-}
 
-func makeFullNodeBloom() []byte {
-	bloom := make([]byte, bloomFilterSize)
-	for i := 0; i < bloomFilterSize; i++ {
-		bloom[i] = 0xFF
-	}
-	return bloom
+	return bloomFilterMatch(peer.bloomFilter, env.Bloom())
 }

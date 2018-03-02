@@ -25,7 +25,6 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -65,7 +64,7 @@ func StartNode(stack *node.Node) {
 	}
 	go func() {
 		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+		signal.Notify(sigc, os.Interrupt)
 		defer signal.Stop(sigc)
 		<-sigc
 		log.Info("Got interrupt, shutting down...")
@@ -86,7 +85,7 @@ func ImportChain(chain *core.BlockChain, fn string) error {
 	// If a signal is received, the import will stop at the next batch.
 	interrupt := make(chan os.Signal, 1)
 	stop := make(chan struct{})
-	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Stop(interrupt)
 	defer close(interrupt)
 	go func() {

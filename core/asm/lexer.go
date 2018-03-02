@@ -206,7 +206,7 @@ func lexLine(l *lexer) stateFn {
 			return lexComment
 		case isSpace(r):
 			l.ignore()
-		case isLetter(r) || r == '_':
+		case isAlphaNumeric(r) || r == '_':
 			return lexElement
 		case isNumber(r):
 			return lexNumber
@@ -278,7 +278,7 @@ func lexElement(l *lexer) stateFn {
 	return lexLine
 }
 
-func isLetter(t rune) bool {
+func isAlphaNumeric(t rune) bool {
 	return unicode.IsLetter(t)
 }
 

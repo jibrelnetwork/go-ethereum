@@ -37,33 +37,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/swarm/api"
 	"github.com/ethereum/go-ethereum/swarm/storage"
 	"github.com/rs/cors"
-)
-
-//setup metrics
-var (
-	postRawCount     = metrics.NewRegisteredCounter("api.http.post.raw.count", nil)
-	postRawFail      = metrics.NewRegisteredCounter("api.http.post.raw.fail", nil)
-	postFilesCount   = metrics.NewRegisteredCounter("api.http.post.files.count", nil)
-	postFilesFail    = metrics.NewRegisteredCounter("api.http.post.files.fail", nil)
-	deleteCount      = metrics.NewRegisteredCounter("api.http.delete.count", nil)
-	deleteFail       = metrics.NewRegisteredCounter("api.http.delete.fail", nil)
-	getCount         = metrics.NewRegisteredCounter("api.http.get.count", nil)
-	getFail          = metrics.NewRegisteredCounter("api.http.get.fail", nil)
-	getFileCount     = metrics.NewRegisteredCounter("api.http.get.file.count", nil)
-	getFileNotFound  = metrics.NewRegisteredCounter("api.http.get.file.notfound", nil)
-	getFileFail      = metrics.NewRegisteredCounter("api.http.get.file.fail", nil)
-	getFilesCount    = metrics.NewRegisteredCounter("api.http.get.files.count", nil)
-	getFilesFail     = metrics.NewRegisteredCounter("api.http.get.files.fail", nil)
-	getListCount     = metrics.NewRegisteredCounter("api.http.get.list.count", nil)
-	getListFail      = metrics.NewRegisteredCounter("api.http.get.list.fail", nil)
-	requestCount     = metrics.NewRegisteredCounter("http.request.count", nil)
-	htmlRequestCount = metrics.NewRegisteredCounter("http.request.html.count", nil)
-	jsonRequestCount = metrics.NewRegisteredCounter("http.request.json.count", nil)
-	requestTimer     = metrics.NewRegisteredResettingTimer("http.request.time", nil)
 )
 
 // ServerConfig is the basic configuration needed for the HTTP server and also
@@ -113,22 +89,18 @@ type Request struct {
 // HandlePostRaw handles a POST request to a raw bzz-raw:/ URI, stores the request
 // body in swarm and returns the resulting storage key as a text/plain response
 func (s *Server) HandlePostRaw(w http.ResponseWriter, r *Request) {
-	postRawCount.Inc(1)
 	if r.uri.Path != "" {
-		postRawFail.Inc(1)
 		s.BadRequest(w, r, "raw POST request cannot contain a path")
 		return
 	}
 
 	if r.Header.Get("Content-Length") == "" {
-		postRawFail.Inc(1)
 		s.BadRequest(w, r, "missing Content-Length header in request")
 		return
 	}
 
 	key, err := s.api.Store(r.Body, r.ContentLength, nil)
 	if err != nil {
-		postRawFail.Inc(1)
 		s.Error(w, r, err)
 		return
 	}
@@ -145,10 +117,8 @@ func (s *Server) HandlePostRaw(w http.ResponseWriter, r *Request) {
 // existing manifest or to a new manifest under <path> and returns the
 // resulting manifest hash as a text/plain response
 func (s *Server) HandlePostFiles(w http.ResponseWriter, r *Request) {
-	postFilesCount.Inc(1)
 	contentType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
-		postFilesFail.Inc(1)
 		s.BadRequest(w, r, err.Error())
 		return
 	}
@@ -157,14 +127,12 @@ func (s *Server) HandlePostFiles(w http.ResponseWriter, r *Request) {
 	if r.uri.Addr != "" {
 		key, err = s.api.Resolve(r.uri)
 		if err != nil {
-			postFilesFail.Inc(1)
 			s.Error(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
 			return
 		}
 	} else {
 		key, err = s.api.NewManifest()
 		if err != nil {
-			postFilesFail.Inc(1)
 			s.Error(w, r, err)
 			return
 		}
@@ -184,7 +152,6 @@ func (s *Server) HandlePostFiles(w http.ResponseWriter, r *Request) {
 		}
 	})
 	if err != nil {
-		postFilesFail.Inc(1)
 		s.Error(w, r, fmt.Errorf("error creating manifest: %s", err))
 		return
 	}
@@ -303,10 +270,8 @@ func (s *Server) handleDirectUpload(req *Request, mw *api.ManifestWriter) error 
 // <path> from <manifest> and returns the resulting manifest hash as a
 // text/plain response
 func (s *Server) HandleDelete(w http.ResponseWriter, r *Request) {
-	deleteCount.Inc(1)
 	key, err := s.api.Resolve(r.uri)
 	if err != nil {
-		deleteFail.Inc(1)
 		s.Error(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
 		return
 	}
@@ -316,7 +281,6 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *Request) {
 		return mw.RemoveEntry(r.uri.Path)
 	})
 	if err != nil {
-		deleteFail.Inc(1)
 		s.Error(w, r, fmt.Errorf("error updating manifest: %s", err))
 		return
 	}
@@ -332,11 +296,9 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *Request) {
 // - bzz-hash://<key> and responds with the hash of the content stored
 //   at the given storage key as a text/plain response
 func (s *Server) HandleGet(w http.ResponseWriter, r *Request) {
-	getCount.Inc(1)
 	key, err := s.api.Resolve(r.uri)
 	if err != nil {
-		getFail.Inc(1)
-		s.NotFound(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
+		s.Error(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
 		return
 	}
 
@@ -345,7 +307,6 @@ func (s *Server) HandleGet(w http.ResponseWriter, r *Request) {
 	if r.uri.Path != "" {
 		walker, err := s.api.NewManifestWalker(key, nil)
 		if err != nil {
-			getFail.Inc(1)
 			s.BadRequest(w, r, fmt.Sprintf("%s is not a manifest", key))
 			return
 		}
@@ -374,7 +335,6 @@ func (s *Server) HandleGet(w http.ResponseWriter, r *Request) {
 			return api.SkipManifest
 		})
 		if entry == nil {
-			getFail.Inc(1)
 			s.NotFound(w, r, fmt.Errorf("Manifest entry could not be loaded"))
 			return
 		}
@@ -384,13 +344,12 @@ func (s *Server) HandleGet(w http.ResponseWriter, r *Request) {
 	// check the root chunk exists by retrieving the file's size
 	reader := s.api.Retrieve(key)
 	if _, err := reader.Size(nil); err != nil {
-		getFail.Inc(1)
 		s.NotFound(w, r, fmt.Errorf("Root chunk not found %s: %s", key, err))
 		return
 	}
 
 	switch {
-	case r.uri.Raw() || r.uri.DeprecatedRaw():
+	case r.uri.Raw():
 		// allow the request to overwrite the content type using a query
 		// parameter
 		contentType := "application/octet-stream"
@@ -411,23 +370,19 @@ func (s *Server) HandleGet(w http.ResponseWriter, r *Request) {
 // header of "application/x-tar" and returns a tar stream of all files
 // contained in the manifest
 func (s *Server) HandleGetFiles(w http.ResponseWriter, r *Request) {
-	getFilesCount.Inc(1)
 	if r.uri.Path != "" {
-		getFilesFail.Inc(1)
 		s.BadRequest(w, r, "files request cannot contain a path")
 		return
 	}
 
 	key, err := s.api.Resolve(r.uri)
 	if err != nil {
-		getFilesFail.Inc(1)
-		s.NotFound(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
+		s.Error(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
 		return
 	}
 
 	walker, err := s.api.NewManifestWalker(key, nil)
 	if err != nil {
-		getFilesFail.Inc(1)
 		s.Error(w, r, err)
 		return
 	}
@@ -475,7 +430,6 @@ func (s *Server) HandleGetFiles(w http.ResponseWriter, r *Request) {
 		return nil
 	})
 	if err != nil {
-		getFilesFail.Inc(1)
 		s.logError("error generating tar stream: %s", err)
 	}
 }
@@ -484,7 +438,6 @@ func (s *Server) HandleGetFiles(w http.ResponseWriter, r *Request) {
 // a list of all files contained in <manifest> under <path> grouped into
 // common prefixes using "/" as a delimiter
 func (s *Server) HandleGetList(w http.ResponseWriter, r *Request) {
-	getListCount.Inc(1)
 	// ensure the root path has a trailing slash so that relative URLs work
 	if r.uri.Path == "" && !strings.HasSuffix(r.URL.Path, "/") {
 		http.Redirect(w, &r.Request, r.URL.Path+"/", http.StatusMovedPermanently)
@@ -493,15 +446,13 @@ func (s *Server) HandleGetList(w http.ResponseWriter, r *Request) {
 
 	key, err := s.api.Resolve(r.uri)
 	if err != nil {
-		getListFail.Inc(1)
-		s.NotFound(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
+		s.Error(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
 		return
 	}
 
 	list, err := s.getManifestList(key, r.uri.Path)
 
 	if err != nil {
-		getListFail.Inc(1)
 		s.Error(w, r, err)
 		return
 	}
@@ -519,7 +470,6 @@ func (s *Server) HandleGetList(w http.ResponseWriter, r *Request) {
 			List: &list,
 		})
 		if err != nil {
-			getListFail.Inc(1)
 			s.logError("error rendering list HTML: %s", err)
 		}
 		return
@@ -588,7 +538,6 @@ func (s *Server) getManifestList(key storage.Key, prefix string) (list api.Manif
 // HandleGetFile handles a GET request to bzz://<manifest>/<path> and responds
 // with the content of the file at <path> from the given <manifest>
 func (s *Server) HandleGetFile(w http.ResponseWriter, r *Request) {
-	getFileCount.Inc(1)
 	// ensure the root path has a trailing slash so that relative URLs work
 	if r.uri.Path == "" && !strings.HasSuffix(r.URL.Path, "/") {
 		http.Redirect(w, &r.Request, r.URL.Path+"/", http.StatusMovedPermanently)
@@ -597,8 +546,7 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *Request) {
 
 	key, err := s.api.Resolve(r.uri)
 	if err != nil {
-		getFileFail.Inc(1)
-		s.NotFound(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
+		s.Error(w, r, fmt.Errorf("error resolving %s: %s", r.uri.Addr, err))
 		return
 	}
 
@@ -606,10 +554,8 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *Request) {
 	if err != nil {
 		switch status {
 		case http.StatusNotFound:
-			getFileNotFound.Inc(1)
 			s.NotFound(w, r, err)
 		default:
-			getFileFail.Inc(1)
 			s.Error(w, r, err)
 		}
 		return
@@ -621,20 +567,18 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *Request) {
 		list, err := s.getManifestList(key, r.uri.Path)
 
 		if err != nil {
-			getFileFail.Inc(1)
 			s.Error(w, r, err)
 			return
 		}
 
 		s.logDebug(fmt.Sprintf("Multiple choices! -->  %v", list))
 		//show a nice page links to available entries
-		ShowMultipleChoices(w, r, list)
+		ShowMultipleChoices(w, &r.Request, list)
 		return
 	}
 
 	// check the root chunk exists by retrieving the file's size
 	if _, err := reader.Size(nil); err != nil {
-		getFileNotFound.Inc(1)
 		s.NotFound(w, r, fmt.Errorf("File not found %s: %s", r.uri, err))
 		return
 	}
@@ -645,29 +589,7 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *Request) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if metrics.Enabled {
-		//The increment for request count and request timer themselves have a flag check
-		//for metrics.Enabled. Nevertheless, we introduce the if here because we
-		//are looking into the header just to see what request type it is (json/html).
-		//So let's take advantage and add all metrics related stuff here
-		requestCount.Inc(1)
-		defer requestTimer.UpdateSince(time.Now())
-		if r.Header.Get("Accept") == "application/json" {
-			jsonRequestCount.Inc(1)
-		} else {
-			htmlRequestCount.Inc(1)
-		}
-	}
 	s.logDebug("HTTP %s request URL: '%s', Host: '%s', Path: '%s', Referer: '%s', Accept: '%s'", r.Method, r.RequestURI, r.URL.Host, r.URL.Path, r.Referer(), r.Header.Get("Accept"))
-
-	if r.RequestURI == "/" && strings.Contains(r.Header.Get("Accept"), "text/html") {
-
-		err := landingPageTemplate.Execute(w, nil)
-		if err != nil {
-			s.logError("error rendering landing page: %s", err)
-		}
-		return
-	}
 
 	uri, err := api.Parse(strings.TrimLeft(r.URL.Path, "/"))
 	req := &Request{Request: *r, uri: uri}
@@ -693,7 +615,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		//   strictly a traditional PUT request which replaces content
 		//   at a URI, and POST is more ubiquitous)
 		if uri.Raw() || uri.DeprecatedRaw() {
-			ShowError(w, req, fmt.Sprintf("No PUT to %s allowed.", uri), http.StatusBadRequest)
+			ShowError(w, r, fmt.Sprintf("No PUT to %s allowed.", uri), http.StatusBadRequest)
 			return
 		} else {
 			s.HandlePostFiles(w, req)
@@ -701,7 +623,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case "DELETE":
 		if uri.Raw() || uri.DeprecatedRaw() {
-			ShowError(w, req, fmt.Sprintf("No DELETE to %s allowed.", uri), http.StatusBadRequest)
+			ShowError(w, r, fmt.Sprintf("No DELETE to %s allowed.", uri), http.StatusBadRequest)
 			return
 		}
 		s.HandleDelete(w, req)
@@ -725,7 +647,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.HandleGetFile(w, req)
 
 	default:
-		ShowError(w, req, fmt.Sprintf("Method "+r.Method+" is not supported.", uri), http.StatusMethodNotAllowed)
+		ShowError(w, r, fmt.Sprintf("Method "+r.Method+" is not supported.", uri), http.StatusMethodNotAllowed)
 
 	}
 }
@@ -757,13 +679,13 @@ func (s *Server) logError(format string, v ...interface{}) {
 }
 
 func (s *Server) BadRequest(w http.ResponseWriter, r *Request, reason string) {
-	ShowError(w, r, fmt.Sprintf("Bad request %s %s: %s", r.Request.Method, r.uri, reason), http.StatusBadRequest)
+	ShowError(w, &r.Request, fmt.Sprintf("Bad request %s %s: %s", r.Method, r.uri, reason), http.StatusBadRequest)
 }
 
 func (s *Server) Error(w http.ResponseWriter, r *Request, err error) {
-	ShowError(w, r, fmt.Sprintf("Error serving %s %s: %s", r.Request.Method, r.uri, err), http.StatusInternalServerError)
+	ShowError(w, &r.Request, fmt.Sprintf("Error serving %s %s: %s", r.Method, r.uri, err), http.StatusInternalServerError)
 }
 
 func (s *Server) NotFound(w http.ResponseWriter, r *Request, err error) {
-	ShowError(w, r, fmt.Sprintf("NOT FOUND error serving %s %s: %s", r.Request.Method, r.uri, err), http.StatusNotFound)
+	ShowError(w, &r.Request, fmt.Sprintf("NOT FOUND error serving %s %s: %s", r.Method, r.uri, err), http.StatusNotFound)
 }
