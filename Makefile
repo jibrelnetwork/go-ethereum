@@ -37,6 +37,11 @@ ios:
 test: all
 	build/env.sh go run build/ci.go test
 
+buildtest:
+	build/env.sh go run build/ci.go install
+	build/env.sh go run build/ci.go test -coverage
+	build/env.sh go run build/ci.go lint
+
 clean:
 	rm -fr build/_workspace/pkg/ $(GOBIN)/*
 
