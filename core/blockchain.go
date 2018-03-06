@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -893,8 +894,13 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	if err := WriteBlock(batch, block); err != nil {
 		return NonStatTy, err
 	}
-	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
-	if err != nil {
+
+	if err := state.CommitToExtDb(block); err != nil {
+		return NonStatTy, err
+	}
+	ethash.AccumulateRewards(bc.Config(), state, block.Header(), block.Uncles(), true, block.Hash())
+
+	if _, err := state.CommitTo(batch, bc.config.IsEIP158(block.Number())); err != nil {
 		return NonStatTy, err
 	}
 	triedb := bc.stateCache.TrieDB()
@@ -956,6 +962,9 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	if err := WriteBlockReceipts(batch, block.Hash(), block.NumberU64(), receipts); err != nil {
 		return NonStatTy, err
 	}
+
+	
+
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf

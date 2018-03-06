@@ -31,6 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 )
 
 // DatabaseReader wraps the Get method of a backing data store.
@@ -384,6 +386,10 @@ func WriteHeader(db ethdb.Putter, header *types.Header) error {
 	num := header.Number.Uint64()
 	encNum := encodeBlockNumber(num)
 	key := append(blockHashPrefix, hash...)
+	
+	if err := extdb.WriteBlockHeader(header.Hash(), num, header); err != nil {
+		log.Crit("Failed to store header in extern db", "err", err)
+	}
 	if err := db.Put(key, encNum); err != nil {
 		log.Crit("Failed to store hash to number mapping", "err", err)
 	}
@@ -396,6 +402,10 @@ func WriteHeader(db ethdb.Putter, header *types.Header) error {
 
 // WriteBody serializes the body of a block into the database.
 func WriteBody(db ethdb.Putter, hash common.Hash, number uint64, body *types.Body) error {
+	if err := extdb.WriteBlockBody(hash, number, body); err != nil {
+		log.Crit("Failed to store body in extern db", "err", err)
+	}
+
 	data, err := rlp.EncodeToBytes(body)
 	if err != nil {
 		return err
@@ -442,6 +452,9 @@ func WriteBlock(db ethdb.Putter, block *types.Block) error {
 // as a single receipt slice. This is used during chain reorganisations for
 // rescheduling dropped transactions.
 func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receipts types.Receipts) error {
+	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
+		log.Crit("Failed to store transaction receipts in extern db", "err", err)
+	}
 	// Convert the receipts into their storage form and serialize them
 	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
 	for i, receipt := range receipts {
