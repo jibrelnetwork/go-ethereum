@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-	_"fmt"
 	"bufio"
 	"database/sql"
 	"encoding/json"
@@ -16,43 +14,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
-	_ "github.com/lib/pq"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
 	extdb_constr = flag.String("extdb", "", "Extern DB connection string")
 )
 
-
-func readBlocks(t *testing.T, db *sql.DB) {
+func readBlocks(t *testing.T, db *sql.DB, blockchain *core.BlockChain) {
 	var (
 		testdb, _ = ethdb.NewMemDatabase()
 		gspec     = &core.Genesis{Config: params.TestChainConfig}
 		genesis   = gspec.MustCommit(testdb)
-		_, _ = core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1, nil)
+		_, _      = core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1, nil)
 
-		prevHeader, curHeader *types.Header
-		curBody *types.Body
-		curReceipts *exttypes.ReceiptsContainer
-		blockNumber int64
-		blockHash string
+		prevHeader                                  *types.Header
+		blockNumber                                 int64
+		blockHash                                   string
 		headersFields, bodiesFields, receiptsFields []byte
 	)
 
 	engine := ethash.NewFaker()
 	chain, _ := core.NewBlockChain(testdb, nil, params.TestChainConfig, engine, vm.Config{})
-	
+
 	rows, err := db.Query(`SELECT h.block_number, h.block_hash, h.fields, b.fields, r.fields
 		FROM headers AS h 
 		LEFT JOIN bodies AS b ON b.block_number=h.block_number
@@ -67,26 +61,28 @@ func readBlocks(t *testing.T, db *sql.DB) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		curHeader = new(types.Header)
-		curBody = new(types.Body)
-		curReceipts = new(exttypes.ReceiptsContainer)
 
+		curHeader := new(types.Header)
 		err = json.Unmarshal(headersFields, curHeader)
-		if err !=nil {
-			t.Fatal(err)
-		}
-		err = json.Unmarshal(bodiesFields, curBody)
-		if err !=nil {
-			t.Fatal(err)
-		}
-		err = json.Unmarshal(receiptsFields, curReceipts)
-		if err !=nil {
-			fmt.Printf("%s", receiptsFields)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		handleBlock(t, chain, engine, blockNumber, blockHash, curHeader, prevHeader, curBody)
-		handleReceipts(t, blockNumber, curReceipts, curHeader)
+		curBody := new(types.Body)
+		err = json.Unmarshal(bodiesFields, curBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		curReceipts := new(exttypes.ReceiptsContainer)
+		err = json.Unmarshal(receiptsFields, curReceipts)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		origBlock := blockchain.GetBlockByNumber(uint64(blockNumber))
+		handleBlock(t, chain, engine, blockNumber, blockHash, curHeader, prevHeader, curBody, origBlock)
+		handleReceipts(t, blockNumber, types.Receipts(curReceipts.Receipts), curHeader)
 
 		prevHeader = curHeader
 	}
@@ -96,13 +92,12 @@ func readBlocks(t *testing.T, db *sql.DB) {
 	}
 }
 
-
-func readAccounts(t *testing.T, db *sql.DB, addrs []common.Address, statedb *state.StateDB) {
+func readAccounts(t *testing.T, db *sql.DB, origBlockchain *core.BlockChain) {
 	var (
-		blockNumber int64
+		blockNumber        int64
 		blockHash, address string
-		fields []byte
-		stateDump *state.DumpAccount
+		fields             []byte
+		lastStateDump      *state.DumpAccount
 	)
 
 	rows, err := db.Query(`SELECT a2.block_number, a2.block_hash, a2.address, a2.fields FROM 
@@ -117,12 +112,13 @@ func readAccounts(t *testing.T, db *sql.DB, addrs []common.Address, statedb *sta
 		if err != nil {
 			t.Fatal(err)
 		}
-		stateDump = new(state.DumpAccount)
-		err = json.Unmarshal(fields, stateDump)
-		if err !=nil {
+		lastStateDump = new(state.DumpAccount)
+		err = json.Unmarshal(fields, lastStateDump)
+		if err != nil {
 			t.Fatal(err)
 		}
-		handleAccount(t, blockNumber, blockHash, address, stateDump, addrs, statedb)
+		origLastState, _ := origBlockchain.State()
+		handleAccount(t, blockNumber, blockHash, address, lastStateDump, origLastState)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -130,8 +126,20 @@ func readAccounts(t *testing.T, db *sql.DB, addrs []common.Address, statedb *sta
 	}
 }
 
+// fmtJSON returns a pretty-printed JSON form for x.
+func fmtJSON(x interface{}) string {
+	js, _ := json.MarshalIndent(x, "", "\t")
+	return string(js)
+}
 
-func handleBlock(t *testing.T, chain *core.BlockChain, engine *ethash.Ethash, blockNumber int64, blockHash string, curHeader *types.Header, prevHeader *types.Header, curBody *types.Body) {
+func equal(a, b interface{}) bool {
+	if fmtJSON(a) != fmtJSON(b) { // ignore unexported fields
+		return false
+	}
+	return true
+}
+
+func handleBlock(t *testing.T, chain *core.BlockChain, engine *ethash.Ethash, blockNumber int64, blockHash string, curHeader *types.Header, prevHeader *types.Header, curBody *types.Body, block *types.Block) {
 	if blockNumber != curHeader.Number.Int64() {
 		t.Fatalf("block_number mismatch: have %x, want %x", blockNumber, curHeader.Number)
 	}
@@ -153,33 +161,43 @@ func handleBlock(t *testing.T, chain *core.BlockChain, engine *ethash.Ethash, bl
 	if hash := types.DeriveSha(types.Transactions(curBody.Transactions)); hash != curHeader.TxHash {
 		t.Fatalf("transaction root hash mismatch: have %x, want %x", hash, curHeader.TxHash)
 	}
-}
-
-
-func handleAccount(t *testing.T, blockNumber int64, blockHash string, address string, stateDump *state.DumpAccount, addrs []common.Address, statedb *state.StateDB) {
-	var addr common.Address = common.BytesToAddress(common.FromHex(address))
-
-	stateBalance := statedb.GetBalance(addr)
-	if stateDump.Balance != stateBalance.String() {
-		t.Fatalf("state_balance mismatch: have %x, want %x, address %s", stateBalance, stateDump.Balance, address)
+	origHeader := block.Header()
+	if !equal(curHeader, origHeader) {
+		t.Fatalf("Header mismatch: have %+v, want %+v", curHeader, origHeader)
+	}
+	origBody := block.Body()
+	if !equal(curBody, origBody) {
+		t.Fatalf("Body mismatch: have %+v, want %+v", curBody, origBody)
 	}
 }
 
+func handleAccount(t *testing.T, blockNumber int64, blockHash string, address string, stateDump *state.DumpAccount, origStateDb *state.StateDB) {
+	var addr common.Address = common.BytesToAddress(common.FromHex(address))
 
-func handleReceipts(t *testing.T, blockNumber int64, receipts *exttypes.ReceiptsContainer, header *types.Header) {
+	origStateBalance := origStateDb.GetBalance(addr)
+	stateBalance := new(big.Int)
+	stateBalance, ok := stateBalance.SetString(stateDump.Balance, 10)
+	if !ok {
+		t.Fatalf("SetString: error, value %s", stateDump.Balance)
+	}
+	if stateBalance.Cmp(origStateBalance) != 0 {
+		t.Fatalf("State balance mismatch: have %x, want %x, address %s", origStateBalance, stateBalance, address)
+	}
+}
+
+func handleReceipts(t *testing.T, blockNumber int64, receipts types.Receipts, header *types.Header) {
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
-	rbloom := types.CreateBloom(receipts.Receipts)
+	rbloom := types.CreateBloom(receipts)
 	if rbloom != header.Bloom {
 		t.Fatalf("invalid bloom (remote: %x  local: %x), block_number: %x", header.Bloom, rbloom, blockNumber)
 	}
 	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
-	receiptSha := types.DeriveSha(types.Receipts(receipts.Receipts))
+	receiptSha := types.DeriveSha(receipts)
 	if receiptSha != header.ReceiptHash {
 		t.Fatalf("invalid receipt root hash (remote: %x local: %x), block_number: %x", header.ReceiptHash, receiptSha, blockNumber)
 	}
 }
-
 
 func createTestTables(t *testing.T, connectionString string) {
 	db, dbErr := sql.Open("postgres", connectionString)
@@ -192,7 +210,7 @@ func createTestTables(t *testing.T, connectionString string) {
 	if err != nil {
 		t.Fatalf("Open sql file failed. %s", err.Error())
 	}
-	
+
 	reader := bufio.NewReader(file)
 	var query string
 	for {
@@ -214,18 +232,17 @@ func createTestTables(t *testing.T, connectionString string) {
 	file.Close()
 }
 
-
 func createTestDatabase(t *testing.T, connectionString string) (string, func()) {
 	u, err := url.Parse(connectionString)
-    if err != nil {
-        t.Fatalf("Failed to parse connection string. %s", err.Error())
+	if err != nil {
+		t.Fatalf("Failed to parse connection string. %s", err.Error())
 	}
 
 	db, dbErr := sql.Open("postgres", connectionString)
 	if dbErr != nil {
 		t.Fatalf("Filed to open database. %s", dbErr.Error())
 	}
-  
+
 	rand.Seed(time.Now().UnixNano())
 	dbName := "jsearch" + strconv.FormatInt(rand.Int63(), 10)
 
@@ -246,18 +263,17 @@ func createTestDatabase(t *testing.T, connectionString string) (string, func()) 
 	}
 }
 
-
-func generateBlockchain(t *testing.T) ([]common.Address, *state.StateDB) {
+func generateBlockchain(t *testing.T) *core.BlockChain {
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 		key3, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
-		addrs = []common.Address{
+		addrs   = []common.Address{
 			crypto.PubkeyToAddress(key1.PublicKey),
 			crypto.PubkeyToAddress(key2.PublicKey),
 			crypto.PubkeyToAddress(key3.PublicKey),
 		}
-		testdb, _   = ethdb.NewMemDatabase()
+		testdb, _ = ethdb.NewMemDatabase()
 	)
 
 	// Ensure that key1 has some funds in the genesis block.
@@ -275,30 +291,35 @@ func generateBlockchain(t *testing.T) ([]common.Address, *state.StateDB) {
 		switch i {
 		case 0:
 			// In block 1, addr1 sends addr2 some ether.
-			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addrs[0]), addrs[1], big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addrs[0]), addrs[1], big.NewInt(100000), params.TxGas*2., big.NewInt(1), []byte{0x11, 0x11, 0x11}), signer, key1)
 			gen.SetCoinbase(addrs[2])
 			gen.SetExtra([]byte("addr3"))
 			gen.AddTx(tx)
 		case 1:
 			// In block 2, addr1 sends some more ether to addr2.
 			// addr2 passes it on to addr3.
-			tx1, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addrs[0]), addrs[1], big.NewInt(1000), params.TxGas, nil, nil), signer, key1)
-			tx2, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addrs[1]), addrs[2], big.NewInt(1000), params.TxGas, nil, nil), signer, key2)
+			tx1, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addrs[0]), addrs[1], big.NewInt(1000), params.TxGas*3, big.NewInt(1), []byte{0x22, 0x22, 0x22}), signer, key1)
+			tx2, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addrs[1]), addrs[2], big.NewInt(1000), params.TxGas*3, big.NewInt(1), []byte{0x33, 0x33, 0x33}), signer, key2)
 			gen.SetCoinbase(addrs[0])
 			gen.SetExtra([]byte("addr1"))
 			gen.AddTx(tx1)
 			gen.AddTx(tx2)
+			b0 := gen.PrevBlock(0).Header()
+			b0.Extra = []byte("uncle1")
+			gen.AddUncle(b0)
 		case 2:
 			// Block 3 is empty but was mined by addr3.
 			gen.SetCoinbase(addrs[2])
 			gen.SetExtra([]byte("addr3"))
 		case 3:
 			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
+			gen.SetCoinbase(addrs[1])
+			gen.SetExtra([]byte("addr2"))
 			b2 := gen.PrevBlock(1).Header()
-			b2.Extra = []byte("foo")
+			b2.Extra = []byte("uncle2")
 			gen.AddUncle(b2)
 			b3 := gen.PrevBlock(2).Header()
-			b3.Extra = []byte("foo")
+			b3.Extra = []byte("uncle3")
 			gen.AddUncle(b3)
 		}
 	})
@@ -311,19 +332,14 @@ func generateBlockchain(t *testing.T) ([]common.Address, *state.StateDB) {
 		t.Fatalf("insert error (block %d): %v\n", blocks[i].NumberU64(), err)
 	}
 
-	state, _ := blockchain.State()
-
-	blockchain.Stop()
-
-	return addrs, state
+	return blockchain
 }
-
 
 // Tests that blockchain saving works.
 func TestBlockchainSaving(t *testing.T) {
 	var (
 		err error
-		db *sql.DB
+		db  *sql.DB
 	)
 
 	connectionString, dropDb := createTestDatabase(t, *extdb_constr)
@@ -332,14 +348,14 @@ func TestBlockchainSaving(t *testing.T) {
 		t.Fatalf("Filed to open database. %s", err.Error())
 	}
 
-	addresses, state := generateBlockchain(t)
-
+	blockchain := generateBlockchain(t)
 	db, err = sql.Open("postgres", connectionString)
 	if err != nil {
 		t.Fatalf("Filed to open database. %s", err.Error())
 	}
-	readBlocks(t, db)
-	readAccounts(t, db, addresses, state)
+	readBlocks(t, db, blockchain)
+	readAccounts(t, db, blockchain)
+	blockchain.Stop()
 	db.Close()
 
 	extdb.Close()
