@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -42,7 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -894,12 +893,10 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	if err := WriteBlock(batch, block); err != nil {
 		return NonStatTy, err
 	}
-	
+
 	if err := state.CommitToExtDb(block); err != nil {
 		return NonStatTy, err
 	}
-
-	ethash.AccumulateRewards(bc.Config(), state, block.Header(), block.Uncles(), true, block.Hash())
 
 	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
 	if err != nil {
