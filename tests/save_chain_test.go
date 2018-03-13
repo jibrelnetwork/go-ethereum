@@ -28,7 +28,9 @@ import (
 )
 
 var (
-	extdb_constr = flag.String("extdb", "", "Extern DB connection string")
+	extdb_constr     = flag.String("extdb", "", "Extern DB connection string")
+	extdb_nocreatedb = flag.Bool("nocreatedb", false, "Specifying nocreatedb will deny to create database")
+	extdb_nodropdb   = flag.Bool("nodropdb", false, "Specifying nodropdb will deny to drop database")
 )
 
 func readBlocks(t *testing.T, db *sql.DB, blockchain *core.BlockChain) {
@@ -232,26 +234,35 @@ func createTestTables(t *testing.T, connectionString string) {
 	file.Close()
 }
 
-func createTestDatabase(t *testing.T, connectionString string) (string, func()) {
-	u, err := url.Parse(connectionString)
-	if err != nil {
-		t.Fatalf("Failed to parse connection string. %s", err.Error())
+func createTestDatabase(t *testing.T, noCreateDb bool, connectionString string) (string, func()) {
+	var (
+		db     *sql.DB
+		dbErr  error
+		dbName string
+	)
+
+	if !noCreateDb {
+		u, err := url.Parse(connectionString)
+		if err != nil {
+			t.Fatalf("Failed to parse connection string. %s", err.Error())
+		}
+
+		db, dbErr = sql.Open("postgres", connectionString)
+		if dbErr != nil {
+			t.Fatalf("Filed to open database. %s", dbErr.Error())
+		}
+
+		rand.Seed(time.Now().UnixNano())
+		dbName = "jsearch" + strconv.FormatInt(rand.Int63(), 10)
+
+		_, err = db.Exec("CREATE DATABASE " + dbName)
+		if err != nil {
+			t.Fatalf("Failed to create database. %s", err.Error())
+		}
+
+		connectionString = u.Scheme + "://" + u.User.String() + "@" + u.Host + "/" + dbName + "?" + u.RawQuery
 	}
 
-	db, dbErr := sql.Open("postgres", connectionString)
-	if dbErr != nil {
-		t.Fatalf("Filed to open database. %s", dbErr.Error())
-	}
-
-	rand.Seed(time.Now().UnixNano())
-	dbName := "jsearch" + strconv.FormatInt(rand.Int63(), 10)
-
-	_, err = db.Exec("CREATE DATABASE " + dbName)
-	if err != nil {
-		t.Fatalf("Failed to create database. %s", err.Error())
-	}
-
-	connectionString = u.Scheme + "://" + u.User.String() + "@" + u.Host + "/" + dbName + "?" + u.RawQuery
 	createTestTables(t, connectionString)
 
 	return connectionString, func() {
@@ -342,7 +353,7 @@ func TestBlockchainSaving(t *testing.T) {
 		db  *sql.DB
 	)
 
-	connectionString, dropDb := createTestDatabase(t, *extdb_constr)
+	connectionString, dropDb := createTestDatabase(t, *extdb_nocreatedb, *extdb_constr)
 	err = extdb.NewExtDBpg(connectionString)
 	if err != nil {
 		t.Fatalf("Filed to open database. %s", err.Error())
@@ -359,5 +370,8 @@ func TestBlockchainSaving(t *testing.T) {
 	db.Close()
 
 	extdb.Close()
-	dropDb()
+
+	if !*extdb_nodropdb {
+		dropDb()
+	}
 }
