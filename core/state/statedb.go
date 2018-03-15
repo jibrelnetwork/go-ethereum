@@ -26,10 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/extdb"
 )
 
 type revision struct {
@@ -628,9 +628,8 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 	return root, err
 }
 
-
 // CommitToExtDb writes the state to the extern database.
-func (s *StateDB) CommitToExtDb(block *types.Block)  error {
+func (s *StateDB) CommitToExtDb(block *types.Block) error {
 
 	// Commit objects to the extern db.
 	for addr, stateObject := range s.stateObjects {
@@ -643,7 +642,15 @@ func (s *StateDB) CommitToExtDb(block *types.Block)  error {
 			}
 		case isDirty:
 			dumpAccount, _ := s.RawDumpStateObject(stateObject)
-			if err := extdb.WriteStateObject(block.Hash(), block.Number().Uint64(), addr, dumpAccount); err != nil {
+			dumpAccountWoStorage := DumpAccount{
+				Balance:  dumpAccount.Balance,
+				Nonce:    dumpAccount.Nonce,
+				Root:     dumpAccount.Root,
+				CodeHash: dumpAccount.CodeHash,
+				Code:     dumpAccount.Code,
+				Storage:  make(map[string]string),
+			}
+			if err := extdb.WriteStateObject(block.Hash(), block.Number().Uint64(), addr, dumpAccountWoStorage); err != nil {
 				return err
 			}
 		}
