@@ -642,14 +642,7 @@ func (s *StateDB) CommitToExtDb(block *types.Block) error {
 			}
 		case isDirty:
 			dumpAccount, _ := s.RawDumpStateObject(stateObject)
-			dumpAccountWoStorage := DumpAccount{
-				Balance:  dumpAccount.Balance,
-				Nonce:    dumpAccount.Nonce,
-				Root:     dumpAccount.Root,
-				CodeHash: dumpAccount.CodeHash,
-				Code:     dumpAccount.Code,
-				Storage:  make(map[string]string),
-			}
+			dumpAccount.Storage = nil
 			if err := extdb.WriteStateObject(block.Hash(), block.Number().Uint64(), addr, dumpAccountWoStorage); err != nil {
 				return err
 			}
