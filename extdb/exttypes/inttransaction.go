@@ -8,11 +8,12 @@ import (
 )
 
 type InternalTransaction struct {
-	BlockNumber *big.Int
-	TimeStamp   *big.Int
-	From        *common.Address
-	To          *common.Address
-	Value       *big.Int
-	GasLimit    uint64
-	Status      string
+	BlockNumber  *big.Int
+	TimeStamp    *big.Int
+	From         *common.Address
+	To           *common.Address
+	Value        *big.Int
+	GasUsed      uint64
+	Status       string
+	ParentTxHash common.Hash
 }
