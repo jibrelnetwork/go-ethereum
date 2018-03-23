@@ -23,10 +23,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
@@ -75,6 +75,7 @@ type Message interface {
 	Nonce() uint64
 	CheckNonce() bool
 	Data() []byte
+	ParentTxHash() common.Hash
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
@@ -239,18 +240,19 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		intTransactionTo := st.to().Address()
 		intTransaction := new(exttypes.InternalTransaction)
 		intTransaction.BlockNumber = st.evm.BlockNumber
-		intTransaction.TimeStamp   = st.evm.Time
-		intTransaction.From        = &intTransactionFrom
-		intTransaction.To          = &intTransactionTo
-		intTransaction.Value       = st.value
-		intTransaction.GasLimit    = st.gas
+		intTransaction.TimeStamp = st.evm.Time
+		intTransaction.From = &intTransactionFrom
+		intTransaction.To = &intTransactionTo
+		intTransaction.Value = st.value
+		intTransaction.GasUsed = st.gas
+		intTransaction.ParentTxHash = msg.ParentTxHash()
 		if vmerr != nil {
 			intTransaction.Status = vmerr.Error()
 		} else {
 			intTransaction.Status = "success"
 		}
 		extdb.WriteInternalTransaction(intTransaction.BlockNumber.Uint64(), intTransaction.TimeStamp.Uint64(), "call", intTransaction)
-		
+
 	}
 	if vmerr != nil {
 		log.Debug("VM returned with error", "err", vmerr)
