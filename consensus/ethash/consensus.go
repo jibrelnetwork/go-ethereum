@@ -527,12 +527,12 @@ func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header)
 // setting the final state and assembling the block.
 func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header, uncles, false, common.Hash{})
+	accumulateRewards(chain.Config(), state, header, uncles, false, common.Hash{}, txs, receipts)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
 	newBlock := types.NewBlock(header, txs, uncles, receipts)
-	accumulateRewards(chain.Config(), state, header, uncles, true, newBlock.Hash())
+	accumulateRewards(chain.Config(), state, header, uncles, true, newBlock.Hash(), txs, receipts)
 	return newBlock, nil
 }
 
@@ -545,7 +545,7 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, onlySave bool, blockHash common.Hash) {
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, onlySave bool, blockHash common.Hash, txs []*types.Transaction, receipts []*types.Receipt) {
 	// Select the correct block reward based on chain progression
 	blockReward := FrontierBlockReward
 	if config.IsByzantium(header.Number) {
@@ -584,10 +584,15 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	if !onlySave {
 		state.AddBalance(header.Coinbase, reward)
 	} else {
+		txs_reward := new(big.Int)
+		for i, receipt := range receipts {
+			txs_reward.Add(txs_reward, new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), txs[i].GasPrice()))
+		}
+
 		bReward.BlockNumber = header.Number
 		bReward.BlockMiner = header.Coinbase
 		bReward.TimeStamp = header.Time
-		bReward.BlockReward = reward
+		bReward.BlockReward = new(big.Int).Add(reward, txs_reward)
 		bReward.UncleInclusionReward = uInclusionReward
 		bReward.Uncles = uRewards
 		extdb.WriteRewards(blockHash, header.Number.Uint64(), header.Coinbase, bReward)
