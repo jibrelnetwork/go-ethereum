@@ -9,11 +9,13 @@ import (
 
 type InternalTransaction struct {
 	BlockNumber  *big.Int
+	Operation    string
+	CallDepth    int
 	TimeStamp    *big.Int
 	From         *common.Address
 	To           *common.Address
 	Value        *big.Int
-	GasUsed      uint64
+	GasLimit     uint64
 	Status       string
 	ParentTxHash common.Hash
 }

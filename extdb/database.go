@@ -113,12 +113,12 @@ func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, add
 	return nil
 }
 
-func (self *ExtDBpg) WriteInternalTransaction(blockNumber uint64, timeStamp uint64, transactionType string, intTransaction *exttypes.InternalTransaction) error {
-	var query = `INSERT INTO internal_transactions (block_number, timestamp, type, fields)
+func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error {
+	var query = `INSERT INTO internal_transactions (block_number, type, timestamp, fields)
                  VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;`
 
 	fieldsString, err := self.SerializeInternalTransactionFields(intTransaction)
-	_, err = self.conn.Exec(query, blockNumber, timeStamp, transactionType, fieldsString)
+	_, err = self.conn.Exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.Operation, intTransaction.TimeStamp.Uint64(), fieldsString)
 	if err != nil {
 		return err
 	}
