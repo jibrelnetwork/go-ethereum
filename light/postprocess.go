@@ -1,4 +1,4 @@
-// Copyright 2016 The go-ethereum Authors
+// Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -19,7 +19,6 @@ package light
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -35,8 +34,14 @@ import (
 )
 
 const (
-	ChtFrequency                   = 32768
-	ChtV1Frequency                 = 4096 // as long as we want to retain LES/1 compatibility, servers generate CHTs with the old, higher frequency
+	// CHTFrequencyClient is the block frequency for creating CHTs on the client side.
+	CHTFrequencyClient = 32768
+
+	// CHTFrequencyServer is the block frequency for creating CHTs on the server side.
+	// Eventually this can be merged back with the client version, but that requires a
+	// full database upgrade, so that should be left for a suitable moment.
+	CHTFrequencyServer = 4096
+
 	HelperTrieConfirmations        = 2048 // number of confirmations before a server is expected to have the given HelperTrie available
 	HelperTrieProcessConfirmations = 256  // number of confirmations before a HelperTrie is generated
 )
@@ -52,19 +57,19 @@ type trustedCheckpoint struct {
 
 var (
 	mainnetCheckpoint = trustedCheckpoint{
-		name:          "ETH mainnet",
-		sectionIdx:    150,
-		sectionHead:   common.HexToHash("1e2e67f289565cbe7bd4367f7960dbd73a3f7c53439e1047cd7ba331c8109e39"),
-		chtRoot:       common.HexToHash("f2a6c9ca143d647b44523cc249f1072c8912358ab873a77a5fdc792b8df99e80"),
-		bloomTrieRoot: common.HexToHash("c018952fa1513c97857e79fbb9a37acaf8432d5b85e52a78eca7dff5fd5900ee"),
+		name:          "mainnet",
+		sectionIdx:    161,
+		sectionHead:   common.HexToHash("75b0c4baa7a62cece48abdcb03b6f31601961c9bece67dcd61df87aad4fc0d8d"),
+		chtRoot:       common.HexToHash("bbbfaa67b29716348997ec21a39c03b8d1fb973f6a43740b865595ba26ee812f"),
+		bloomTrieRoot: common.HexToHash("d6db6e6248354d7453391ce97830072a28ea4216be0bd95a5db9f53b1a64677b"),
 	}
 
 	ropstenCheckpoint = trustedCheckpoint{
-		name:          "Ropsten testnet",
-		sectionIdx:    75,
-		sectionHead:   common.HexToHash("12e68324f4578ea3e8e7fb3968167686729396c9279287fa1f1a8b51bb2d05b4"),
-		chtRoot:       common.HexToHash("3e51dc095c69fa654a4cac766e0afff7357515b4b3c3a379c675f810363e54be"),
-		bloomTrieRoot: common.HexToHash("33e3a70b33c1d73aa698d496a80615e98ed31fa8f56969876180553b32333339"),
+		name:          "ropsten",
+		sectionIdx:    83,
+		sectionHead:   common.HexToHash("3ca623586bc0da35f1fc8d9b6b55950f3b1f69be9c6501846a2df672adb61236"),
+		chtRoot:       common.HexToHash("8f08ec7783969768c6ef06e5fe3398223cbf4ae2907b676da7b6fe6c7f55b059"),
+		bloomTrieRoot: common.HexToHash("02d86d3c6a87f8f8a92c2a59bbba2132ff6f9f61b0915a5dc28a9d8279219fd0"),
 	}
 )
 
@@ -100,7 +105,7 @@ func GetChtRoot(db ethdb.Database, sectionIdx uint64, sectionHead common.Hash) c
 // GetChtV2Root reads the CHT root assoctiated to the given section from the database
 // Note that sectionIdx is specified according to LES/2 CHT section size
 func GetChtV2Root(db ethdb.Database, sectionIdx uint64, sectionHead common.Hash) common.Hash {
-	return GetChtRoot(db, (sectionIdx+1)*(ChtFrequency/ChtV1Frequency)-1, sectionHead)
+	return GetChtRoot(db, (sectionIdx+1)*(CHTFrequencyClient/CHTFrequencyServer)-1, sectionHead)
 }
 
 // StoreChtRoot writes the CHT root assoctiated to the given section into the database
@@ -124,10 +129,10 @@ type ChtIndexerBackend struct {
 func NewChtIndexer(db ethdb.Database, clientMode bool) *core.ChainIndexer {
 	var sectionSize, confirmReq uint64
 	if clientMode {
-		sectionSize = ChtFrequency
+		sectionSize = CHTFrequencyClient
 		confirmReq = HelperTrieConfirmations
 	} else {
-		sectionSize = ChtV1Frequency
+		sectionSize = CHTFrequencyServer
 		confirmReq = HelperTrieProcessConfirmations
 	}
 	idb := ethdb.NewTable(db, "chtIndex-")
@@ -174,8 +179,8 @@ func (c *ChtIndexerBackend) Commit() error {
 	}
 	c.triedb.Commit(root, false)
 
-	if ((c.section+1)*c.sectionSize)%ChtFrequency == 0 {
-		log.Info("Storing CHT", "idx", c.section*c.sectionSize/ChtFrequency, "sectionHead", fmt.Sprintf("%064x", c.lastHash), "root", fmt.Sprintf("%064x", root))
+	if ((c.section+1)*c.sectionSize)%CHTFrequencyClient == 0 {
+		log.Info("Storing CHT", "section", c.section*c.sectionSize/CHTFrequencyClient, "head", c.lastHash, "root", root)
 	}
 	StoreChtRoot(c.diskdb, c.section, c.lastHash, root)
 	return nil
@@ -294,7 +299,7 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 	b.triedb.Commit(root, false)
 
 	sectionHead := b.sectionHeads[b.bloomTrieRatio-1]
-	log.Info("Storing BloomTrie", "section", b.section, "sectionHead", fmt.Sprintf("%064x", sectionHead), "root", fmt.Sprintf("%064x", root), "compression ratio", float64(compSize)/float64(decompSize))
+	log.Info("Storing bloom trie", "section", b.section, "head", sectionHead, "root", root, "compression", float64(compSize)/float64(decompSize))
 	StoreBloomTrieRoot(b.diskdb, b.section, sectionHead, root)
 
 	return nil
