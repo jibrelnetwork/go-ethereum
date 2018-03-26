@@ -73,6 +73,7 @@ type Message interface {
 	Nonce() uint64
 	CheckNonce() bool
 	Data() []byte
+	ParentTxHash() common.Hash
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
@@ -215,9 +216,6 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 
 	// Pay intrinsic gas
 	gas, err := IntrinsicGas(st.data, contractCreation, homestead)
-	if err != nil {
-		return nil, 0, false, err
-	}
 	if err = st.useGas(gas); err != nil {
 		return nil, 0, false, err
 	}

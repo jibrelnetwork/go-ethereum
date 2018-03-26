@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/extdb"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -114,7 +115,6 @@ var (
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.RPCCORSDomainFlag,
-		utils.RPCVirtualHostsFlag,
 		utils.EthStatsURLFlag,
 		utils.MetricsEnabledFlag,
 		utils.FakePoWFlag,
@@ -123,6 +123,7 @@ var (
 		utils.GpoPercentileFlag,
 		utils.ExtraDataFlag,
 		configFileFlag,
+		extdb.ExtDbUriFlag,
 	}
 
 	rpcFlags = []cli.Flag{
@@ -226,6 +227,7 @@ func geth(ctx *cli.Context) error {
 // miner.
 func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
+    extdb.NewExtDBpg(ctx.GlobalString("extdb"))
 	utils.StartNode(stack)
 
 	// Unlock any account specifically requested
@@ -304,4 +306,6 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}
+
+
 }

@@ -68,7 +68,8 @@ type txdata struct {
 	S *big.Int `json:"s" gencodec:"required"`
 
 	// This is only used when marshaling to JSON.
-	Hash *common.Hash `json:"hash" rlp:"-"`
+	Hash *common.Hash    `json:"hash" rlp:"-"`
+	From *common.Address `json:"from" rlp:"-"`
 }
 
 type txdataMarshaling struct {
@@ -153,8 +154,10 @@ func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
 // MarshalJSON encodes the web3 RPC transaction format.
 func (tx *Transaction) MarshalJSON() ([]byte, error) {
 	hash := tx.Hash()
+	sigCache := tx.from.Load().(SigCache)
 	data := tx.data
 	data.Hash = &hash
+	data.From = &sigCache.from
 	return data.MarshalJSON()
 }
 
@@ -232,6 +235,7 @@ func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 		amount:     tx.data.Amount,
 		data:       tx.data.Payload,
 		checkNonce: true,
+		parent_tx:  tx.Hash(),
 	}
 
 	var err error
@@ -447,6 +451,7 @@ type Message struct {
 	gasPrice   *big.Int
 	data       []byte
 	checkNonce bool
+	parent_tx  common.Hash
 }
 
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
@@ -459,14 +464,16 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		gasPrice:   gasPrice,
 		data:       data,
 		checkNonce: checkNonce,
+		parent_tx:  common.Hash{},
 	}
 }
 
-func (m Message) From() common.Address { return m.from }
-func (m Message) To() *common.Address  { return m.to }
-func (m Message) GasPrice() *big.Int   { return m.gasPrice }
-func (m Message) Value() *big.Int      { return m.amount }
-func (m Message) Gas() uint64          { return m.gasLimit }
-func (m Message) Nonce() uint64        { return m.nonce }
-func (m Message) Data() []byte         { return m.data }
-func (m Message) CheckNonce() bool     { return m.checkNonce }
+func (m Message) From() common.Address      { return m.from }
+func (m Message) To() *common.Address       { return m.to }
+func (m Message) GasPrice() *big.Int        { return m.gasPrice }
+func (m Message) Value() *big.Int           { return m.amount }
+func (m Message) Gas() uint64               { return m.gasLimit }
+func (m Message) Nonce() uint64             { return m.nonce }
+func (m Message) Data() []byte              { return m.data }
+func (m Message) CheckNonce() bool          { return m.checkNonce }
+func (m Message) ParentTxHash() common.Hash { return m.parent_tx }

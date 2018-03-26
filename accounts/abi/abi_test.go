@@ -689,11 +689,7 @@ func TestABI_MethodById(t *testing.T) {
 	}
 	for name, m := range abi.Methods {
 		a := fmt.Sprintf("%v", m)
-		m2, err := abi.MethodById(m.Id())
-		if err != nil {
-			t.Fatalf("Failed to look up ABI method: %v", err)
-		}
-		b := fmt.Sprintf("%v", m2)
+		b := fmt.Sprintf("%v", abi.MethodById(m.Id()))
 		if a != b {
 			t.Errorf("Method %v (id %v) not 'findable' by id in ABI", name, common.ToHex(m.Id()))
 		}

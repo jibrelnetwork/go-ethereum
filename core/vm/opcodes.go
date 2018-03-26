@@ -63,9 +63,6 @@ const (
 	XOR
 	NOT
 	BYTE
-	SHL
-	SHR
-	SAR
 
 	SHA3 = 0x20
 )
@@ -237,9 +234,6 @@ var opCodeToString = map[OpCode]string{
 	OR:     "OR",
 	XOR:    "XOR",
 	BYTE:   "BYTE",
-	SHL:    "SHL",
-	SHR:    "SHR",
-	SAR:    "SAR",
 	ADDMOD: "ADDMOD",
 	MULMOD: "MULMOD",
 
@@ -406,9 +400,6 @@ var stringToOp = map[string]OpCode{
 	"OR":             OR,
 	"XOR":            XOR,
 	"BYTE":           BYTE,
-	"SHL":            SHL,
-	"SHR":            SHR,
-	"SAR":            SAR,
 	"ADDMOD":         ADDMOD,
 	"MULMOD":         MULMOD,
 	"SHA3":           SHA3,

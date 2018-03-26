@@ -59,16 +59,15 @@ func (w *wizard) run() {
 	fmt.Println()
 
 	// Make sure we have a good network name to work with	fmt.Println()
-	// Docker accepts hyphens in image names, but doesn't like it for container names
 	if w.network == "" {
-		fmt.Println("Please specify a network name to administer (no spaces or hyphens, please)")
+		fmt.Println("Please specify a network name to administer (no spaces, please)")
 		for {
 			w.network = w.readString()
-			if !strings.Contains(w.network, " ") && !strings.Contains(w.network, "-") {
+			if !strings.Contains(w.network, " ") {
 				fmt.Printf("\nSweet, you can set this via --network=%s next time!\n\n", w.network)
 				break
 			}
-			log.Error("I also like to live dangerously, still no spaces or hyphens")
+			log.Error("I also like to live dangerously, still no spaces")
 		}
 	}
 	log.Info("Administering Ethereum network", "name", w.network)

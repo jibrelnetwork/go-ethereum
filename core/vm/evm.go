@@ -23,6 +23,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -64,8 +66,9 @@ type Context struct {
 	GetHash GetHashFunc
 
 	// Message information
-	Origin   common.Address // Provides information for ORIGIN
-	GasPrice *big.Int       // Provides information for GASPRICE
+	ParentTxHash common.Hash
+	Origin       common.Address // Provides information for ORIGIN
+	GasPrice     *big.Int       // Provides information for GASPRICE
 
 	// Block information
 	Coinbase    common.Address // Provides information for COINBASE
@@ -181,6 +184,28 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			evm.vmConfig.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
 		}()
 	}
+        if evm.depth>0 {
+	        defer func() {
+			intTransactionFrom := caller.Address()
+			intTransactionTo := addr
+			intTransaction := new(exttypes.InternalTransaction)
+			intTransaction.BlockNumber = evm.BlockNumber
+			intTransaction.TimeStamp = evm.Time
+			intTransaction.From = &intTransactionFrom
+			intTransaction.To = &intTransactionTo
+			intTransaction.Value = value
+			intTransaction.GasLimit = gas
+			intTransaction.CallDepth = evm.depth
+			intTransaction.Operation = "call"
+			intTransaction.ParentTxHash = evm.Context.ParentTxHash
+		        if err != nil {
+				intTransaction.Status = err.Error()
+			} else {
+				intTransaction.Status = "success"
+			}
+			extdb.WriteInternalTransaction(intTransaction)
+		}()
+        }
 	ret, err = run(evm, contract, input)
 
 	// When an error was returned by the EVM or when setting the creation code
@@ -353,6 +378,28 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 	if evm.vmConfig.Debug && evm.depth == 0 {
 		evm.vmConfig.Tracer.CaptureStart(caller.Address(), contractAddr, true, code, gas, value)
 	}
+
+	defer func() {
+		intTransactionFrom := caller.Address()
+		intTransactionTo := contractAddr
+		intTransaction := new(exttypes.InternalTransaction)
+		intTransaction.BlockNumber = evm.BlockNumber
+		intTransaction.TimeStamp = evm.Time
+		intTransaction.From = &intTransactionFrom
+		intTransaction.To = &intTransactionTo
+		intTransaction.Value = value
+		intTransaction.GasLimit = gas
+		intTransaction.CallDepth = evm.depth
+		intTransaction.Operation = "create"
+		intTransaction.ParentTxHash = evm.Context.ParentTxHash
+		if err != nil {
+			intTransaction.Status = err.Error()
+		} else {
+			intTransaction.Status = "success"
+		}
+		extdb.WriteInternalTransaction(intTransaction)
+	}()
+
 	start := time.Now()
 
 	ret, err = run(evm, contract, nil)
