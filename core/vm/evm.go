@@ -393,7 +393,6 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		intTransaction.CallDepth = evm.depth
 		intTransaction.Operation = "create"
 		intTransaction.ParentTxHash = evm.Context.ParentTxHash
-		intTransaction.Payload = input
 		if err != nil {
 			intTransaction.Status = err.Error()
 		} else {
