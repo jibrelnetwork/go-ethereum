@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 type InternalTransaction struct {
@@ -18,4 +19,5 @@ type InternalTransaction struct {
 	GasLimit     uint64
 	Status       string
 	ParentTxHash common.Hash
+	Payload      hexutil.Bytes
 }

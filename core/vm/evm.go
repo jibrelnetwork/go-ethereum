@@ -184,8 +184,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			evm.vmConfig.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
 		}()
 	}
-        if evm.depth>0 {
-	        defer func() {
+	if evm.depth > 0 {
+		defer func() {
 			intTransactionFrom := caller.Address()
 			intTransactionTo := addr
 			intTransaction := new(exttypes.InternalTransaction)
@@ -198,14 +198,15 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			intTransaction.CallDepth = evm.depth
 			intTransaction.Operation = "call"
 			intTransaction.ParentTxHash = evm.Context.ParentTxHash
-		        if err != nil {
+			intTransaction.Payload = input
+			if err != nil {
 				intTransaction.Status = err.Error()
 			} else {
 				intTransaction.Status = "success"
 			}
 			extdb.WriteInternalTransaction(intTransaction)
 		}()
-        }
+	}
 	ret, err = run(evm, contract, input)
 
 	// When an error was returned by the EVM or when setting the creation code
@@ -392,6 +393,7 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		intTransaction.CallDepth = evm.depth
 		intTransaction.Operation = "create"
 		intTransaction.ParentTxHash = evm.Context.ParentTxHash
+		intTransaction.Payload = input
 		if err != nil {
 			intTransaction.Status = err.Error()
 		} else {

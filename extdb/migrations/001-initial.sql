@@ -39,6 +39,7 @@ CREATE TABLE rewards (
 );
 
 CREATE TABLE internal_transactions (
+    id bigserial primary key,
     block_number bigint,
     type varchar(20),
     timestamp bigint,
