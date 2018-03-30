@@ -552,6 +552,9 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	bReward := new(exttypes.BlockReward)
 	uRewards := make([]*exttypes.UncleReward, len(uncles))
 	uInclusionReward := new(big.Int)
+	bUnclesReward := new(big.Int)
+	bBlockReward := new(big.Int)
+	bBlockReward.Add(bBlockReward, blockReward)
 
 	for i, uncle := range uncles {
 		r.Add(uncle.Number, big8)
@@ -560,19 +563,18 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		r.Div(r, big8)
 		if !onlySave {
 			state.AddBalance(uncle.Coinbase, r)
-		}
-
-		r.Div(blockReward, big32)
-
-		reward.Add(reward, r)
-
-		if onlySave {
+		} else {
 			uRewards[i] = new(exttypes.UncleReward)
 			uRewards[i].Miner = uncle.Coinbase
 			uRewards[i].UnclePosition = i
-			uRewards[i].BlockReward = r
-			uInclusionReward.Add(uInclusionReward, r)
+			uRewards[i].UncleReward = new(big.Int)
+			uRewards[i].UncleReward.Add(uRewards[i].UncleReward, r)
+			bUnclesReward.Add(bUnclesReward, r)
 		}
+
+		r.Div(blockReward, big32)
+		reward.Add(reward, r)
+		uInclusionReward.Add(uInclusionReward, r)
 	}
 
 	if !onlySave {
@@ -586,8 +588,10 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		bReward.BlockNumber = header.Number
 		bReward.BlockMiner = header.Coinbase
 		bReward.TimeStamp = header.Time
-		bReward.BlockReward = new(big.Int).Add(reward, txs_reward)
+		bReward.BlockReward = bBlockReward
+		bReward.TxsReward = txs_reward
 		bReward.UncleInclusionReward = uInclusionReward
+		bReward.UnclesReward = bUnclesReward
 		bReward.Uncles = uRewards
 		extdb.WriteRewards(blockHash, header.Number.Uint64(), header.Coinbase, bReward)
 	}
