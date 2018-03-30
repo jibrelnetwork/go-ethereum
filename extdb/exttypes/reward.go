@@ -10,14 +10,16 @@ import (
 type UncleReward struct {
 	Miner         common.Address
 	UnclePosition int
-	BlockReward   *big.Int
+	UncleReward   *big.Int
 }
 
 type BlockReward struct {
 	BlockNumber          *big.Int
 	TimeStamp            *big.Int
 	BlockMiner           common.Address
-	BlockReward          *big.Int
 	Uncles               []*UncleReward
+	BlockReward          *big.Int
 	UncleInclusionReward *big.Int
+	TxsReward            *big.Int
+	UnclesReward         *big.Int
 }
