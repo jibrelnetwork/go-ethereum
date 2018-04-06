@@ -18,6 +18,7 @@ type ExtDB interface {
 	WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
 	WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
 	WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error
+	NewBlockNotify(blockNumber uint64) error
 }
 
 var (
@@ -93,6 +94,15 @@ func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Addr
 func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error {
 	if db != nil {
 		if err := db.WriteInternalTransaction(intTransaction); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewBlockNotify(blockNumber uint64) error {
+	if db != nil {
+		if err := db.NewBlockNotify(blockNumber); err != nil {
 			return err
 		}
 	}

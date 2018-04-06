@@ -135,6 +135,16 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 	return nil
 }
 
+func (self *ExtDBpg) NewBlockNotify(blockNumber uint64) error {
+	var query = `select pg_notify('newblock', CAST($1 AS text));`
+
+	_, err := self.conn.Exec(query, blockNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (self *ExtDBpg) SerializeHeaderFields(header *types.Header) (string, error) {
 	b, err := json.Marshal(header)
 	return string(b), err
