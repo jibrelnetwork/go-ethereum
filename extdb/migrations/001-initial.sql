@@ -31,11 +31,10 @@ CREATE TABLE accounts (
 );
 
 CREATE TABLE rewards (
-    block_number bigint,
+    block_number bigint UNIQUE,
     block_hash varchar(70),
     address varchar(45),
-    fields jsonb,
-    UNIQUE(block_number, address)
+    fields jsonb
 );
 
 CREATE TABLE internal_transactions (
