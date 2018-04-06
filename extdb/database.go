@@ -67,6 +67,8 @@ func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, b
 }
 
 func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *types.Transaction) error {
+	log.Info("ExtDB write pendinf transaction", "tx_hash", txHash)
+
 	var query = `INSERT INTO pending_transactions (tx_hash, fields)
                  VALUES ($1, $2)
                  ON CONFLICT (tx_hash) DO UPDATE
@@ -81,6 +83,8 @@ func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *ty
 }
 
 func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts *exttypes.ReceiptsContainer) error {
+	log.Info("ExtDB write receipts", "hash", blockHash, "number", blockNumber)
+
 	var query = "INSERT INTO receipts (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
 	fieldsString, err := self.SerializeReceiptsFields(receipts)
 	if err != nil {
@@ -104,6 +108,8 @@ func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64,
 }
 
 func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error {
+	log.Info("ExtDB write reewards", "hash", blockHash, "number", blockNumber, "miner", addr)
+
 	var query = "INSERT INTO rewards (block_hash, block_number, address, fields) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
 	fieldsString, err := self.SerializeBlockRewardsFields(blockReward)
 	_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, addr.Hex(), fieldsString)
@@ -114,6 +120,10 @@ func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, add
 }
 
 func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error {
+	log.Info("ExtDB write internal transaction",
+		"block_number", intTransaction.BlockNumber.Uint64(),
+		"op", intTransaction.Operation)
+
 	var query = `INSERT INTO internal_transactions (block_number, type, timestamp, fields)
                  VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;`
 
