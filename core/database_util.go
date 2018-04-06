@@ -27,6 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -404,6 +406,10 @@ func WriteHeader(db ethdb.Putter, header *types.Header) error {
 	num := header.Number.Uint64()
 	encNum := encodeBlockNumber(num)
 	key := append(blockHashPrefix, hash...)
+
+	if err := extdb.WriteBlockHeader(header.Hash(), num, header); err != nil {
+		log.Crit("Failed to store header in extern db", "err", err)
+	}
 	if err := db.Put(key, encNum); err != nil {
 		log.Crit("Failed to store hash to number mapping", "err", err)
 	}
@@ -419,6 +425,9 @@ func WriteBody(db ethdb.Putter, hash common.Hash, number uint64, body *types.Bod
 	data, err := rlp.EncodeToBytes(body)
 	if err != nil {
 		return err
+	}
+	if err := extdb.WriteBlockBody(hash, number, body); err != nil {
+		log.Crit("Failed to store body in extern db", "err", err)
 	}
 	return WriteBodyRLP(db, hash, number, data)
 }
@@ -464,6 +473,10 @@ func WriteBlock(db ethdb.Putter, block *types.Block) error {
 func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receipts types.Receipts) error {
 	// Convert the receipts into their storage form and serialize them
 	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
+	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
+		log.Crit("Failed to store transaction receipts in extern db", "err", err)
+	}
+
 	for i, receipt := range receipts {
 		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
 	}
