@@ -146,6 +146,11 @@ func (ec *EthereumClient) SubscribeNewHead(ctx *Context, handler NewHeadHandler,
 	return &Subscription{rawSub}, nil
 }
 
+func (ec *EthereumClient) NetworkID(ctx *Context) (*BigInt, error) {
+	id, err := ec.client.NetworkID(ctx.context)
+	return &BigInt{id}, err
+}
+
 // State Access
 
 // GetBalanceAt returns the wei balance of the given account.
