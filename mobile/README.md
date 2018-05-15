@@ -21,11 +21,22 @@ do {
 	 try params.setBigInt(1, bigInt: GethNewBigInt(100))
 
 	 let abi = GethNewEIP20ABI(&error)
-	 let data = try abi?.packArguments("transfer", params: params)
+	 let msgData = try abi?.packArguments("transfer", params: params)
 	 print("data: \(data)")
 } catch {
 }
 
+```
+##### Get gas estimate
+```swift
+let msg = GethNewCallMsg()!
+msg.setFrom(wallet1)
+msg.setTo(contractAddr)
+msg.setData(msgData) // from code above
+msg.setGasPrice(gasPrice)
+let gasPtr = UnsafeMutablePointer<Int64>.allocate(capacity: 1)
+try client.estimateGas(ctx, msg: msg, gas: gasPtr)
+let gasCount = GethNewBigInt(gasPtr.pointee)
 ```
 
 #### Calling ERC20-compatible contract methods
