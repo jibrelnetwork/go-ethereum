@@ -35,6 +35,19 @@ func NewBigInt(x int64) *BigInt {
 	return &BigInt{big.NewInt(x)}
 }
 
+func NewBigIntFromString(s string) (*BigInt, error) {
+	return NewBigIntFromStringWithBase(s, 0)
+}
+
+func NewBigIntFromStringWithBase(s string, base int) (*BigInt, error) {
+	i := big.NewInt(0)
+	result, success := i.SetString(s, base)
+	if !success {
+		return nil, errors.New("Can't parse string, it should contain number and optional prefix `0x` `0b` `0`")
+	}
+	return &BigInt{result}, nil
+}
+
 // GetBytes returns the absolute value of x as a big-endian byte slice.
 func (bi *BigInt) GetBytes() []byte {
 	return bi.bigint.Bytes()
@@ -72,6 +85,8 @@ func (bi *BigInt) Sign() int {
 	return bi.bigint.Sign()
 }
 
+/* In case of error reading string value is undefined. Commented
+
 // SetString sets the big int to x.
 //
 // The string prefix determines the actual conversion base. A prefix of "0x" or
@@ -80,6 +95,7 @@ func (bi *BigInt) Sign() int {
 func (bi *BigInt) SetString(x string, base int) {
 	bi.bigint.SetString(x, base)
 }
+*/
 
 // BigInts represents a slice of big ints.
 type BigInts struct{ bigints []*big.Int }

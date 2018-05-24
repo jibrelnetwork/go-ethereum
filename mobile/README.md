@@ -52,7 +52,7 @@ var balance = try contract.balance(of: wallet1, opts: nil)
 ```
 for send transactions
 ```swift
-let gasPrice = try client.suggestGasPrice(ctx)
+Let Gasprice = try client.suggestGasPrice(ctx)
 let noncePtr = UnsafeMutablePointer<Int64>.allocate(capacity: 1)
 try client.getPendingNonce(at: ctx, account: wallet1, nonce: noncePtr)
 let acc1 = account(address: wallet1.getHex())

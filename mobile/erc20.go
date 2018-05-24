@@ -8,12 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"jibrel.network/EIP20/contracts"
+	"github.com/jibrel.network/EIP20/contracts"
 )
 
 type Contract struct {
-	contract *contracts.ERC20
+	contract *contracts.EIP20
 	CallOpts *CallOpts
+	Address  *Address
 }
 
 type TransactionSigner interface {
@@ -21,16 +22,34 @@ type TransactionSigner interface {
 }
 
 func NewContract(address *Address, client *EthereumClient) (contract *Contract, _ error) {
-	erc20, err := contracts.NewERC20(address.address, client.client)
+	eip20, err := contracts.NewEIP20(address.address, client.client)
 	if err != nil {
 		return nil, err
 	}
 	return &Contract{
-		contract: erc20,
+		contract: eip20,
 		CallOpts: &CallOpts{
 			opts: bind.CallOpts{Pending: false},
 		},
+		Address: address,
 	}, nil
+}
+
+func (c *Contract) Name(opts *CallOpts) (string, error) {
+	return c.contract.Name(c.getCallOpts(opts))
+}
+
+func (c *Contract) Symbol(opts *CallOpts) (string, error) {
+	return c.contract.Symbol(c.getCallOpts(opts))
+}
+
+func (c *Contract) Decimals(opts *CallOpts) (*BigInt, error) {
+	result, err := c.contract.Decimals(c.getCallOpts(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	return &BigInt{big.NewInt(int64(result))}, nil
 }
 
 func (c *Contract) getCallOpts(opts *CallOpts) (result *bind.CallOpts) {
