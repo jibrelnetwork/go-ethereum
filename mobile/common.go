@@ -151,6 +151,12 @@ func NewAddressFromHex(hex string) (address *Address, _ error) {
 	return a, nil
 }
 
+func NewAddressFromPublicKey(uncompressedKey []byte) *Address {
+	hash := Keccak256Hash(uncompressedKey[1:])
+	addr := common.BytesToAddress(hash[11:])
+	return &Address{addr}
+}
+
 // SetBytes sets the specified slice of bytes as the address value.
 func (a *Address) SetBytes(address []byte) error {
 	if length := len(address); length != common.AddressLength {
