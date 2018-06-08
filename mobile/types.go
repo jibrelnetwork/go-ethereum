@@ -363,10 +363,11 @@ func (r *Receipt) GetTxHash() *Hash             { return &Hash{r.receipt.TxHash}
 func (r *Receipt) GetContractAddress() *Address { return &Address{r.receipt.ContractAddress} }
 func (r *Receipt) GetGasUsed() int64            { return int64(r.receipt.GasUsed) }
 
-func Keccak256Hash(data []byte) (result [32]byte) {
+func Keccak256Hash(data []byte) []byte {
+	result := make([]byte, 32)
 	var h hash.Hash
 	h = sha3.NewKeccak256()
 	h.Write(data)
 	h.Sum(result[:0])
-	return
+	return result
 }
