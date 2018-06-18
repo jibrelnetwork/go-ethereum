@@ -634,7 +634,7 @@ func (s *StateDB) CommitToExtDb(block *types.Block) error {
 	// Commit objects to the extern db.
 	for addr, stateObject := range s.stateObjects {
 		_, isDirty := s.stateObjectsDirty[addr]
-		log.Info("ExtDB Write state", "Addr", addr, "Block", block.Number().Uint64())
+		log.Debug("ExtDB Write state", "Addr", addr, "Block", block.Number().Uint64())
 		switch {
 		case stateObject.suicided:
 			if err := extdb.DeleteStateObject(block.Hash(), block.Number().Uint64(), addr); err != nil {

@@ -41,7 +41,7 @@ func (self *ExtDBpg) Close() error {
 }
 
 func (self *ExtDBpg) WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
-	log.Info("ExtDB write block header", "hash", blockHash, "number", blockNumber)
+	log.Debug("ExtDB write block header", "hash", blockHash, "number", blockNumber)
 
 	fieldsString, err := self.SerializeHeaderFields(header)
 	var query = "INSERT INTO headers (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
@@ -54,7 +54,7 @@ func (self *ExtDBpg) WriteBlockHeader(blockHash common.Hash, blockNumber uint64,
 }
 
 func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body) error {
-	log.Info("ExtDB write block body", "hash", blockHash, "number", blockNumber)
+	log.Debug("ExtDB write block body", "hash", blockHash, "number", blockNumber)
 
 	fieldsString, err := self.SerializeBodyFields(body)
 	var query = "INSERT INTO bodies (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
@@ -67,7 +67,7 @@ func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, b
 }
 
 func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *types.Transaction) error {
-	log.Info("ExtDB write pendinf transaction", "tx_hash", txHash)
+	log.Debug("ExtDB write pendinf transaction", "tx_hash", txHash)
 
 	var query = `INSERT INTO pending_transactions (tx_hash, fields)
                  VALUES ($1, $2)
@@ -83,7 +83,7 @@ func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *ty
 }
 
 func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts *exttypes.ReceiptsContainer) error {
-	log.Info("ExtDB write receipts", "hash", blockHash, "number", blockNumber)
+	log.Debug("ExtDB write receipts", "hash", blockHash, "number", blockNumber)
 
 	var query = "INSERT INTO receipts (block_hash, block_number, fields) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
 	fieldsString, err := self.SerializeReceiptsFields(receipts)
@@ -108,7 +108,7 @@ func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64,
 }
 
 func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error {
-	log.Info("ExtDB write reewards", "hash", blockHash, "number", blockNumber, "miner", addr)
+	log.Debug("ExtDB write reewards", "hash", blockHash, "number", blockNumber, "miner", addr)
 
 	var query = "INSERT INTO rewards (block_hash, block_number, address, fields) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
 	fieldsString, err := self.SerializeBlockRewardsFields(blockReward)
@@ -120,7 +120,7 @@ func (self *ExtDBpg) WriteRewards(blockHash common.Hash, blockNumber uint64, add
 }
 
 func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error {
-	log.Info("ExtDB write internal transaction",
+	log.Debug("ExtDB write internal transaction",
 		"block_number", intTransaction.BlockNumber.Uint64(),
 		"op", intTransaction.Operation)
 
