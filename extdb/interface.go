@@ -76,7 +76,7 @@ func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.
 
 func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address) error {
 	if db != nil {
-		log.Info("Stubbed delete state object in ext db", "Addr", address.Hex())
+		log.Debug("Stubbed delete state object in ext db", "Addr", address.Hex())
 	}
 	return nil
 
