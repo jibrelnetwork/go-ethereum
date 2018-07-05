@@ -88,12 +88,12 @@ func (self *StateDB) RawDumpStateObject(obj *stateObject) (DumpAccount, error) {
 		Root:     common.Bytes2Hex(obj.data.Root[:]),
 		CodeHash: common.Bytes2Hex(obj.data.CodeHash),
 		Code:     common.Bytes2Hex(obj.Code(self.db)),
-		Storage:  make(map[string]string),
+		Storage:  nil,
 	}
-	storageIt := trie.NewIterator(obj.getTrie(self.db).NodeIterator(nil))
-	for storageIt.Next() {
-		account.Storage[common.Bytes2Hex(self.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(storageIt.Value)
-	}
+	// storageIt := trie.NewIterator(obj.getTrie(self.db).NodeIterator(nil))
+	// for storageIt.Next() {
+	// 	account.Storage[common.Bytes2Hex(self.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(storageIt.Value)
+	// }
 	// json, err := json.MarshalIndent(account, "", "    ")
 	// if err != nil {
 	// 	fmt.Println("obj dump err", err)
