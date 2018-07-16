@@ -94,6 +94,8 @@ type EVM struct {
 	StateDB StateDB
 	// Depth is the current call stack
 	depth int
+	// Index is the current internal transaction index
+	index int
 
 	// chainConfig contains information about the current chain
 	chainConfig *params.ChainConfig
@@ -186,6 +188,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	if evm.depth > 0 {
 		defer func() {
+			evm.index++
 			intTransactionFrom := caller.Address()
 			intTransactionTo := addr
 			intTransaction := new(exttypes.InternalTransaction)
@@ -199,6 +202,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			intTransaction.Operation = "call"
 			intTransaction.ParentTxHash = evm.Context.ParentTxHash
 			intTransaction.Payload = input
+			intTransaction.Index = evm.index
 			if err != nil {
 				intTransaction.Status = err.Error()
 			} else {
@@ -381,6 +385,7 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 	}
 
 	defer func() {
+		evm.index++
 		intTransactionFrom := caller.Address()
 		intTransactionTo := contractAddr
 		intTransaction := new(exttypes.InternalTransaction)
@@ -393,6 +398,7 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		intTransaction.CallDepth = evm.depth
 		intTransaction.Operation = "create"
 		intTransaction.ParentTxHash = evm.Context.ParentTxHash
+		intTransaction.Index = evm.index
 		if err != nil {
 			intTransaction.Status = err.Error()
 		} else {

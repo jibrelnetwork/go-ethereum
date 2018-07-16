@@ -153,13 +153,14 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 		"block_number", intTransaction.BlockNumber.Uint64(),
 		"op", intTransaction.Operation)
 
-	var query = `INSERT INTO internal_transactions (block_number, type, timestamp, fields)
-                 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;`
+	var query = `INSERT INTO internal_transactions (block_number, parent_tx_hash, index, type, timestamp, fields)
+                 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;`
 
 	fieldsString, err := self.SerializeInternalTransactionFields(intTransaction)
 	log.Debug("ExtDB internal transaction serialization", "time", time.Since(start))
 	start = time.Now()
-	_, err = self.conn.Exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.Operation, intTransaction.TimeStamp.Uint64(), fieldsString)
+	_, err = self.conn.Exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.ParentTxHash.Hex(), intTransaction.Index,
+		intTransaction.Operation, intTransaction.TimeStamp.Uint64(), fieldsString)
 	log.Debug("ExtDB internal transaction insertion", "time", time.Since(start))
 
 	if err != nil {

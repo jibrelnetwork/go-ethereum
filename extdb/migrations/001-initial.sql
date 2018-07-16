@@ -40,12 +40,16 @@ CREATE TABLE rewards (
 CREATE TABLE internal_transactions (
     id bigserial primary key,
     block_number bigint,
+    parent_tx_hash varchar(70),
+    index bigint,
     type varchar(20),
     timestamp bigint,
     fields jsonb
 );
 
 CREATE INDEX ON internal_transactions(block_number);
+
+CREATE UNIQUE INDEX internal_transactions_uniq ON internal_transactions(parent_tx_hash,index,type);
 
 CREATE INDEX ON pending_transactions(status);
 

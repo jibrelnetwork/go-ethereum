@@ -19,5 +19,6 @@ type InternalTransaction struct {
 	GasLimit     uint64
 	Status       string
 	ParentTxHash common.Hash
+	Index        int
 	Payload      hexutil.Bytes
 }
