@@ -26,6 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -346,4 +347,30 @@ func Keccak256Hash(data []byte) []byte {
 	h.Write(data)
 	h.Sum(result[:0])
 	return result
+}
+
+type TxHashSigner struct {
+	signer types.Signer
+}
+
+func (txSigner *TxHashSigner) Hash(transaction *Transaction) []byte {
+	return txSigner.signer.Hash(transaction.tx).Bytes()
+}
+
+func NewEIP155Signer(chainId *BigInt) *TxHashSigner {
+	signer := types.NewEIP155Signer(chainId.bigint)
+	return &TxHashSigner{signer}
+}
+
+func NewHomesteadSigner() *TxHashSigner {
+	return &TxHashSigner{types.HomesteadSigner{}}
+}
+
+func SignBytes(bytes []byte, privateKey []byte) ([]byte, error) {
+	key, error := crypto.ToECDSA(privateKey)
+	if error != nil {
+		return nil, error
+	}
+	defer zeroBytes(key)
+	return crypto.Sign(bytes, key)
 }
