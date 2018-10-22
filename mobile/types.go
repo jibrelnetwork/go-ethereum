@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -371,6 +372,7 @@ func SignBytes(bytes []byte, privateKey []byte) ([]byte, error) {
 	if error != nil {
 		return nil, error
 	}
-	defer zeroBytes(key)
-	return crypto.Sign(bytes, key)
+	result, err := crypto.Sign(bytes, key)
+	key.D = new(big.Int)
+	return result, err
 }

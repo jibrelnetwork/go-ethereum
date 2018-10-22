@@ -160,6 +160,18 @@ func (abi *ContractABI) PackArguments(method string, params *Parameters) ([]byte
 	return abi.abi.Pack(method, params.params...)
 }
 
+func (abi *ContractABI) UnpackString(method string, output []byte) (string, error) {
+	var result = new(string)
+	err := abi.abi.Unpack(result, method, output)
+	return *result, err
+}
+
+func (abi *ContractABI) UnpackUInt8(method string, output []byte) (uint8, error) {
+	var result = new(uint8)
+	err := abi.abi.Unpack(result, method, output)
+	return *result, err
+}
+
 type Parameters struct {
 	params []interface{}
 }

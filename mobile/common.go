@@ -22,9 +22,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.
@@ -155,6 +157,17 @@ func NewAddressFromPublicKey(uncompressedKey []byte) *Address {
 	hash := Keccak256Hash(uncompressedKey[1:])
 	addr := common.BytesToAddress(hash[11:])
 	return &Address{addr}
+}
+
+func NewAddressFromPrivateKey(privateKey []byte) (address *Address, _ error) {
+	key, err := crypto.ToECDSA(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	pubKey := key.PublicKey
+	key.D = new(big.Int)
+	uncompressedPubKey := crypto.FromECDSAPub(&pubKey)
+	return NewAddressFromPublicKey(uncompressedPubKey), nil
 }
 
 // SetBytes sets the specified slice of bytes as the address value.
