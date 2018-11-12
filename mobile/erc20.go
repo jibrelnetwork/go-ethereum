@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -172,6 +174,43 @@ func (abi *ContractABI) UnpackUInt8(method string, output []byte) (uint8, error)
 	return *result, err
 }
 
+func (abi *ContractABI) UnpackTransferFrom(topics *Hashes, data []byte) (*TransferEvent, error) {
+	var event = new(contracts.ERC20Transfer)
+	err := abi.Unpack(event, "Transfer", topics.hashes, data)
+	if err != nil {
+		return nil, err
+	}
+	return &TransferEvent{event}, nil
+}
+
+func (abi *ContractABI) UnpackTransfer(logWrapper *Log) (*TransferEvent, error) {
+	var event = new(contracts.ERC20Transfer)
+	err := abi.UnpackLog(event, "Transfer", *logWrapper.log)
+	if err != nil {
+		return nil, err
+	}
+	return &TransferEvent{event}, nil
+}
+
+func (abi *ContractABI) UnpackLog(out interface{}, event string, log types.Log) error {
+	return abi.Unpack(out, event, log.Topics, log.Data)
+}
+
+func (cAbi *ContractABI) Unpack(out interface{}, event string, topics []common.Hash, data []byte) error {
+	if len(data) > 0 {
+		if err := cAbi.abi.Unpack(out, event, data); err != nil {
+			return err
+		}
+	}
+	var indexed abi.Arguments
+	for _, arg := range cAbi.abi.Events[event].Inputs {
+		if arg.Indexed {
+			indexed = append(indexed, arg)
+		}
+	}
+	return bind.ParseTopics(out, indexed, topics[1:])
+}
+
 type Parameters struct {
 	params []interface{}
 }
@@ -243,4 +282,24 @@ func (p *Parameters) GetAddress(index int) (*Address, error) {
 
 func (p *Parameters) SetAddress(index int, address *Address) error {
 	return p.set(index, address.address)
+}
+
+type TransferEvent struct {
+	event *contracts.ERC20Transfer
+}
+
+func (t *TransferEvent) FromAddress() *Address {
+	return &Address{t.event.From}
+}
+
+func (t *TransferEvent) ToAddress() *Address {
+	return &Address{t.event.To}
+}
+
+func (t *TransferEvent) Value() *BigInt {
+	return &BigInt{t.event.Value}
+}
+
+func (t *TransferEvent) Logs() *Log {
+	return &Log{&t.event.Raw}
 }

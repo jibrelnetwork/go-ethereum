@@ -19,7 +19,9 @@
 package geth
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -53,4 +55,14 @@ func (l *Logs) Get(index int) (log *Log, _ error) {
 		return nil, errors.New("index out of bounds")
 	}
 	return &Log{l.logs[index]}, nil
+}
+
+func NewLogFromJSON(jsonString string) (_ *Log, _ error) {
+	var log = new(types.Log)
+	dec := json.NewDecoder(strings.NewReader(jsonString))
+	err := dec.Decode(&log)
+	if err != nil {
+		return nil, err
+	}
+	return &Log{log}, nil
 }

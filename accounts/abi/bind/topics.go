@@ -187,3 +187,7 @@ func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) er
 	}
 	return nil
 }
+
+func ParseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) error {
+	return parseTopics(out, fields, topics)
+}
