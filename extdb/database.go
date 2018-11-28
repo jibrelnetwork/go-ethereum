@@ -26,7 +26,7 @@ func NewExtDBpg(dbURI string) error {
 }
 
 func (self *ExtDBpg) Connect(dbURI string) error {
-	conn, err := sql.Open("postgres", "postgres://localhost/jsearch_raw?sslmode=disable") //dbURI)
+	conn, err := sql.Open("postgres", dbURI)
 	self.conn = conn
 	if err != nil {
 		log.Crit("ExtDB Error when connect to extern DB", "Error", err)
