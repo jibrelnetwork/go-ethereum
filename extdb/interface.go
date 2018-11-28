@@ -18,7 +18,12 @@ type ExtDB interface {
 	WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
 	WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
 	WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error
+	WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error
+	WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error
 	NewBlockNotify(blockNumber uint64) error
+	NewReorgNotify(blockNumber uint64, blockHash common.Hash) error
+	NewChainSplitNotify(commonNumber uint64, commonHash common.Hash) error
+	ReinsertBlock(blockHash common.Hash, blockNumber uint64) error
 }
 
 var (
@@ -103,6 +108,51 @@ func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) erro
 func NewBlockNotify(blockNumber uint64) error {
 	if db != nil {
 		if err := db.NewBlockNotify(blockNumber); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+	if db != nil {
+		if err := db.WriteReorg(blockHash, blockNumber, header); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error {
+	if db != nil {
+		if err := db.WriteChainSplit(common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewReorgNotify(blockNumber uint64, blockHash common.Hash) error {
+	if db != nil {
+		if err := db.NewReorgNotify(blockNumber, blockHash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewChainSplitNotify(commonNumber uint64, commonHash common.Hash) error {
+	if db != nil {
+		if err := db.NewChainSplitNotify(commonNumber, commonHash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ReinsertBlock(blockHash common.Hash, blockNumber uint64) error {
+	if db != nil {
+		if err := db.ReinsertBlock(blockHash, blockNumber); err != nil {
 			return err
 		}
 	}

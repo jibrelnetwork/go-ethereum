@@ -1185,6 +1185,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(), "elapsed",
 				common.PrettyDuration(time.Since(bstart)), "txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()))
 
+			extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
+			extdb.NewReorgNotify(block.Number().Uint64(), block.Hash())
+
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainSideEvent{block})
 		}
@@ -1325,6 +1328,8 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		}
 		logFn("Chain split detected", "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
+		extdb.WriteChainSplit(commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
+		extdb.NewChainSplitNotify(commonBlock.NumberU64(), commonBlock.Hash())
 	} else {
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -1333,6 +1338,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	for i := len(newChain) - 1; i >= 0; i-- {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
+		extdb.ReinsertBlock(newChain[i].Hash(), newChain[i].NumberU64())
 		// write lookup entries for hash based transaction/receipt searches
 		if err := WriteTxLookupEntries(bc.db, newChain[i]); err != nil {
 			return err
@@ -1352,6 +1358,8 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if len(oldChain) > 0 {
 		go func() {
 			for _, block := range oldChain {
+				extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
+				extdb.NewReorgNotify(block.Number().Uint64(), block.Hash())
 				bc.chainSideFeed.Send(ChainSideEvent{Block: block})
 			}
 		}()

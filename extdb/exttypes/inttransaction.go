@@ -10,6 +10,7 @@ import (
 
 type InternalTransaction struct {
 	BlockNumber  *big.Int
+	BlockHash common.Hash
 	Operation    string
 	CallDepth    int
 	TimeStamp    *big.Int

@@ -74,6 +74,7 @@ type Context struct {
 	Coinbase    common.Address // Provides information for COINBASE
 	GasLimit    uint64         // Provides information for GASLIMIT
 	BlockNumber *big.Int       // Provides information for NUMBER
+	BlockHash   common.Hash    // Provides information for HASH
 	Time        *big.Int       // Provides information for TIME
 	Difficulty  *big.Int       // Provides information for DIFFICULTY
 }
@@ -192,7 +193,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			intTransactionFrom := caller.Address()
 			intTransactionTo := addr
 			intTransaction := new(exttypes.InternalTransaction)
-			intTransaction.BlockNumber = evm.BlockNumber
+			intTransaction.BlockNumber = evm.Context.BlockNumber
+			intTransaction.BlockHash = evm.Context.BlockHash
 			intTransaction.TimeStamp = evm.Time
 			intTransaction.From = &intTransactionFrom
 			intTransaction.To = &intTransactionTo
@@ -384,28 +386,31 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		evm.vmConfig.Tracer.CaptureStart(caller.Address(), contractAddr, true, code, gas, value)
 	}
 
-	defer func() {
-		evm.index++
-		intTransactionFrom := caller.Address()
-		intTransactionTo := contractAddr
-		intTransaction := new(exttypes.InternalTransaction)
-		intTransaction.BlockNumber = evm.BlockNumber
-		intTransaction.TimeStamp = evm.Time
-		intTransaction.From = &intTransactionFrom
-		intTransaction.To = &intTransactionTo
-		intTransaction.Value = value
-		intTransaction.GasLimit = gas
-		intTransaction.CallDepth = evm.depth
-		intTransaction.Operation = "create"
-		intTransaction.ParentTxHash = evm.Context.ParentTxHash
-		intTransaction.Index = evm.index
-		if err != nil {
-			intTransaction.Status = err.Error()
-		} else {
-			intTransaction.Status = "success"
-		}
-		extdb.WriteInternalTransaction(intTransaction)
-	}()
+	if evm.depth > 0 {
+		defer func() {
+			evm.index++
+			intTransactionFrom := caller.Address()
+			intTransactionTo := contractAddr
+			intTransaction := new(exttypes.InternalTransaction)
+			intTransaction.BlockNumber = evm.Context.BlockNumber
+			intTransaction.BlockHash = evm.Context.BlockHash
+			intTransaction.TimeStamp = evm.Time
+			intTransaction.From = &intTransactionFrom
+			intTransaction.To = &intTransactionTo
+			intTransaction.Value = value
+			intTransaction.GasLimit = gas
+			intTransaction.CallDepth = evm.depth
+			intTransaction.Operation = "create"
+			intTransaction.ParentTxHash = evm.Context.ParentTxHash
+			intTransaction.Index = evm.index
+			if err != nil {
+				intTransaction.Status = err.Error()
+			} else {
+				intTransaction.Status = "success"
+			}
+			extdb.WriteInternalTransaction(intTransaction)
+		}()
+	}
 
 	start := time.Now()
 

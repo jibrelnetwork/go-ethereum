@@ -26,13 +26,13 @@ func NewExtDBpg(dbURI string) error {
 }
 
 func (self *ExtDBpg) Connect(dbURI string) error {
-	conn, err := sql.Open("postgres", dbURI)
+	conn, err := sql.Open("postgres", "postgres://localhost/jsearch_raw?sslmode=disable") //dbURI)
 	self.conn = conn
 	if err != nil {
-		log.Crit("Error when connect to extern DB", "Error", err)
+		log.Crit("ExtDB Error when connect to extern DB", "Error", err)
 	} else {
 		re := regexp.MustCompile("(//.*:)(.*)(@)")
-		log.Info("Connected to extern DB", "URI", re.ReplaceAllString(dbURI, "$1****$3"))
+		log.Info("ExtDB Connected to extern DB", "URI", re.ReplaceAllString(dbURI, "$1****$3"))
 	}
 	return err
 }
@@ -53,7 +53,7 @@ func (self *ExtDBpg) WriteBlockHeader(blockHash common.Hash, blockNumber uint64,
 	log.Debug("ExtDB header insertion", "time", time.Since(start))
 
 	if err != nil {
-		log.Warn("Error writing header to extern DB", "Error", err)
+		log.Warn("ExtDB Error writing header to extern DB", "Error", err)
 	}
 	return err
 }
@@ -70,7 +70,7 @@ func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, b
 	log.Debug("ExtDB body insertion", "time", time.Since(start))
 
 	if err != nil {
-		log.Warn("Error writing body to extern DB", "Error", err)
+		log.Warn("ExtDB Error writing body to extern DB", "Error", err)
 	}
 	return nil
 }
@@ -117,6 +117,8 @@ func (self *ExtDBpg) WriteReceipts(blockHash common.Hash, blockNumber uint64, re
 
 func (self *ExtDBpg) WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error {
 	start := time.Now()
+	log.Debug("ExtDB write state object", "hash", blockHash, "number", blockNumber)
+
 	var query = "INSERT INTO accounts (block_hash, block_number, address, fields) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
 	fieldsString, err := self.SerializeStateObjectFields(obj)
 	log.Debug("ExtDB account serialization", "time", time.Since(start))
@@ -153,14 +155,15 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 		"block_number", intTransaction.BlockNumber.Uint64(),
 		"op", intTransaction.Operation)
 
-	var query = `INSERT INTO internal_transactions (block_number, parent_tx_hash, index, type, timestamp, fields)
-                 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;`
+	var query = `INSERT INTO internal_transactions (block_number, block_hash, parent_tx_hash, index, type, timestamp, fields)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING;`
 
 	fieldsString, err := self.SerializeInternalTransactionFields(intTransaction)
 	log.Debug("ExtDB internal transaction serialization", "time", time.Since(start))
 	start = time.Now()
-	_, err = self.conn.Exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.ParentTxHash.Hex(), intTransaction.Index,
-		intTransaction.Operation, intTransaction.TimeStamp.Uint64(), fieldsString)
+	_, err = self.conn.Exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.BlockHash.Hex(),
+		intTransaction.ParentTxHash.Hex(), intTransaction.Index, intTransaction.Operation,
+		intTransaction.TimeStamp.Uint64(), fieldsString)
 	log.Debug("ExtDB internal transaction insertion", "time", time.Since(start))
 
 	if err != nil {
@@ -169,11 +172,81 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 	return nil
 }
 
+func (self *ExtDBpg) WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+	start := time.Now()
+	log.Debug("ExtDB write block reorg", "hash", blockHash, "number", blockNumber)
+
+	headerString, err := self.SerializeHeaderFields(header)
+	log.Debug("ExtDB header serialization reorg", "time", time.Since(start))
+
+	start = time.Now()
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted) VALUES ($1, $2, $3, false) ON CONFLICT(block_hash) DO UPDATE SET reinserted=false;"
+	_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString)
+	log.Debug("ExtDB reorg insertion", "time", time.Since(start))
+
+	if err != nil {
+		log.Warn("ExtDB Error writing reorg to extern DB", "Error", err)
+	}
+	return err
+}
+
+func (self *ExtDBpg) ReinsertBlock(blockHash common.Hash, blockNumber uint64) error {
+	start := time.Now()
+	log.Debug("ExtDB reinsert block reorg", "hash", blockHash, "number", blockNumber)
+
+	start = time.Now()
+	var query = "UPDATE reorgs SET reinserted=true WHERE block_hash=$1"
+	_, err := self.conn.Exec(query, blockHash.Hex())
+	log.Debug("ExtDB reinsert block reorg", "time", time.Since(start))
+
+	if err != nil {
+		log.Warn("ExtDB Error reinserting block to extern DB", "Error", err)
+	}
+	return err
+}
+
+func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error {
+	start := time.Now()
+	log.Debug("ExtDB write chain split", "common hash", common_block_hash, "common number", common_block_number, "drop length", drop_length, "drop hash", drop_block_hash, "add length", add_length)
+
+	start = time.Now()
+	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING"
+	_, err := self.conn.Exec(query, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex())
+	log.Debug("ExtDB chain split insertion", "time", time.Since(start))
+
+	if err != nil {
+		log.Warn("ExtDB Error writing chain split to extern DB", "Error", err)
+	}
+	return err
+}
+
 func (self *ExtDBpg) NewBlockNotify(blockNumber uint64) error {
 	var query = `select pg_notify('newblock', CAST($1 AS text));`
 	start := time.Now()
 	_, err := self.conn.Exec(query, blockNumber)
 	log.Debug("ExtDB new block notify", "time", time.Since(start))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *ExtDBpg) NewReorgNotify(blockNumber uint64, blockHash common.Hash) error {
+	var query = `select pg_notify('newreorg', CAST(concat($1,',',$2) AS text));`
+	start := time.Now()
+	_, err := self.conn.Exec(query, blockNumber, blockHash.Hex())
+	log.Debug("ExtDB new reorg notify", "time", time.Since(start))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *ExtDBpg) NewChainSplitNotify(commonNumber uint64, commonHash common.Hash) error {
+	var query = `select pg_notify('newsplit', CAST(concat($1,',',$2) AS text));`
+	start := time.Now()
+	_, err := self.conn.Exec(query, commonNumber, commonHash.Hex())
+	log.Debug("ExtDB new chain split notify", "time", time.Since(start))
 	if err != nil {
 		return err
 	}
