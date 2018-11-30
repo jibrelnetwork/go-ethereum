@@ -220,10 +220,10 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 	return err
 }
 
-func (self *ExtDBpg) NewBlockNotify(blockNumber uint64) error {
+func (self *ExtDBpg) NewBlockNotify(blockHash common.Hash) error {
 	var query = `select pg_notify('newblock', CAST($1 AS text));`
 	start := time.Now()
-	_, err := self.conn.Exec(query, blockNumber)
+	_, err := self.conn.Exec(query, blockHash)
 	log.Debug("ExtDB new block notify", "time", time.Since(start))
 	if err != nil {
 		return err
@@ -231,10 +231,10 @@ func (self *ExtDBpg) NewBlockNotify(blockNumber uint64) error {
 	return nil
 }
 
-func (self *ExtDBpg) NewReorgNotify(blockNumber uint64, blockHash common.Hash) error {
-	var query = `select pg_notify('newreorg', CAST(concat($1,',',$2) AS text));`
+func (self *ExtDBpg) NewReorgNotify(blockHash common.Hash) error {
+	var query = `select pg_notify('newreorg', CAST($1 AS text));`
 	start := time.Now()
-	_, err := self.conn.Exec(query, blockNumber, blockHash.Hex())
+	_, err := self.conn.Exec(query, blockHash.Hex())
 	log.Debug("ExtDB new reorg notify", "time", time.Since(start))
 	if err != nil {
 		return err
@@ -242,11 +242,22 @@ func (self *ExtDBpg) NewReorgNotify(blockNumber uint64, blockHash common.Hash) e
 	return nil
 }
 
-func (self *ExtDBpg) NewChainSplitNotify(commonNumber uint64, commonHash common.Hash) error {
-	var query = `select pg_notify('newsplit', CAST(concat($1,',',$2) AS text));`
+func (self *ExtDBpg) NewChainSplitNotify(commonHash common.Hash) error {
+	var query = `select pg_notify('newsplit', CAST($1 AS text));`
 	start := time.Now()
-	_, err := self.conn.Exec(query, commonNumber, commonHash.Hex())
+	_, err := self.conn.Exec(query, commonHash.Hex())
 	log.Debug("ExtDB new chain split notify", "time", time.Since(start))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *ExtDBpg) NewReinsertNotify(blockHash common.Hash) error {
+	var query = `select pg_notify('newreinsert', CAST($1 AS text));`
+	start := time.Now()
+	_, err := self.conn.Exec(query, blockHash.Hex())
+	log.Debug("ExtDB new reinsert block notify", "time", time.Since(start))
 	if err != nil {
 		return err
 	}

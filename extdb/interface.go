@@ -20,10 +20,11 @@ type ExtDB interface {
 	WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error
 	WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error
 	WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error
-	NewBlockNotify(blockNumber uint64) error
-	NewReorgNotify(blockNumber uint64, blockHash common.Hash) error
-	NewChainSplitNotify(commonNumber uint64, commonHash common.Hash) error
 	ReinsertBlock(blockHash common.Hash, blockNumber uint64) error
+	NewBlockNotify(blockHash common.Hash) error
+	NewReorgNotify(blockHash common.Hash) error
+	NewChainSplitNotify(commonHash common.Hash) error
+	NewReinsertNotify(blockHash common.Hash) error
 }
 
 var (
@@ -105,15 +106,6 @@ func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) erro
 	return nil
 }
 
-func NewBlockNotify(blockNumber uint64) error {
-	if db != nil {
-		if err := db.NewBlockNotify(blockNumber); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	if db != nil {
 		if err := db.WriteReorg(blockHash, blockNumber, header); err != nil {
@@ -132,27 +124,45 @@ func WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, 
 	return nil
 }
 
-func NewReorgNotify(blockNumber uint64, blockHash common.Hash) error {
-	if db != nil {
-		if err := db.NewReorgNotify(blockNumber, blockHash); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func NewChainSplitNotify(commonNumber uint64, commonHash common.Hash) error {
-	if db != nil {
-		if err := db.NewChainSplitNotify(commonNumber, commonHash); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func ReinsertBlock(blockHash common.Hash, blockNumber uint64) error {
 	if db != nil {
 		if err := db.ReinsertBlock(blockHash, blockNumber); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewBlockNotify(blockHash common.Hash) error {
+	if db != nil {
+		if err := db.NewBlockNotify(blockHash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewReorgNotify(blockHash common.Hash) error {
+	if db != nil {
+		if err := db.NewReorgNotify(blockHash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewChainSplitNotify(commonHash common.Hash) error {
+	if db != nil {
+		if err := db.NewChainSplitNotify(commonHash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewReinsertNotify(blockHash common.Hash) error {
+	if db != nil {
+		if err := db.NewReinsertNotify(blockHash); err != nil {
 			return err
 		}
 	}
