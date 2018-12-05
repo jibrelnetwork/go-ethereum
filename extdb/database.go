@@ -18,6 +18,11 @@ type ExtDBpg struct {
 }
 
 func NewExtDBpg(dbURI string) error {
+	if dbURI == "null" {
+		db = nil
+		log.Info("Extern DB is null, all extern db operatons will be skipped")
+		return nil
+	}
 	dbpg := &ExtDBpg{
 		conn: nil,
 	}
