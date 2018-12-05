@@ -20,7 +20,7 @@ type ExtDB interface {
 	WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error
 	WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error
 	WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error
-	ReinsertBlock(blockHash common.Hash, blockNumber uint64) error
+	ReinsertBlock(blockHash common.Hash, blockNumber uint64, header *types.Header) error
 	NewBlockNotify(blockHash common.Hash) error
 	NewReorgNotify(blockHash common.Hash) error
 	NewChainSplitNotify(commonHash common.Hash) error
@@ -124,9 +124,9 @@ func WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, 
 	return nil
 }
 
-func ReinsertBlock(blockHash common.Hash, blockNumber uint64) error {
+func ReinsertBlock(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	if db != nil {
-		if err := db.ReinsertBlock(blockHash, blockNumber); err != nil {
+		if err := db.ReinsertBlock(blockHash, blockNumber, header); err != nil {
 			return err
 		}
 	}

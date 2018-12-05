@@ -180,7 +180,7 @@ func (self *ExtDBpg) WriteReorg(blockHash common.Hash, blockNumber uint64, heade
 	log.Debug("ExtDB header serialization reorg", "time", time.Since(start))
 
 	start = time.Now()
-	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted) VALUES ($1, $2, $3, false) ON CONFLICT(block_hash) DO UPDATE SET reinserted=false;"
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted) VALUES ($1, $2, $3, false) ON CONFLICT DO NOTHING;"
 	_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString)
 	log.Debug("ExtDB reorg insertion", "time", time.Since(start))
 
@@ -190,14 +190,17 @@ func (self *ExtDBpg) WriteReorg(blockHash common.Hash, blockNumber uint64, heade
 	return err
 }
 
-func (self *ExtDBpg) ReinsertBlock(blockHash common.Hash, blockNumber uint64) error {
+func (self *ExtDBpg) ReinsertBlock(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	start := time.Now()
-	log.Debug("ExtDB reinsert block reorg", "hash", blockHash, "number", blockNumber)
+	log.Debug("ExtDB reinsert block", "hash", blockHash, "number", blockNumber)
+
+	headerString, err := self.SerializeHeaderFields(header)
+	log.Debug("ExtDB header serialization reinsert block", "time", time.Since(start))
 
 	start = time.Now()
-	var query = "UPDATE reorgs SET reinserted=true WHERE block_hash=$1"
-	_, err := self.conn.Exec(query, blockHash.Hex())
-	log.Debug("ExtDB reinsert block reorg", "time", time.Since(start))
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted) VALUES ($1, $2, $3, true) ON CONFLICT DO NOTHING;"
+	_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString)
+	log.Debug("ExtDB reinsert block insertion", "time", time.Since(start))
 
 	if err != nil {
 		log.Warn("ExtDB Error reinserting block to extern DB", "Error", err)

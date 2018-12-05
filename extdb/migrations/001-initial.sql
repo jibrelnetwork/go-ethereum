@@ -23,14 +23,16 @@ CREATE TABLE receipts (
 );
 
 CREATE TABLE accounts (
+    id bigserial primary key,
     block_number bigint,
-    block_hash varchar(70) UNIQUE,
+    block_hash varchar(70),
     address varchar(45),
     fields jsonb,
-    UNIQUE(block_number, address)
+    UNIQUE(block_hash, address)
 );
 
 CREATE TABLE rewards (
+    id bigserial primary key,
     block_number bigint,
     block_hash varchar(70) UNIQUE,
     address varchar(45),
@@ -55,15 +57,17 @@ CREATE TABLE chain_splits (
     drop_length bigint,
     drop_block_hash varchar(70),
     add_length bigint,
-    add_block_hash varchar(70)
+    add_block_hash varchar(70),
+    node_id varchar(70)
 );
 
 CREATE TABLE reorgs (
     id bigserial primary key,
     block_number bigint,
-    block_hash varchar(70) UNIQUE,
+    block_hash varchar(70),
     header jsonb,
-    reinserted boolean
+    reinserted boolean,
+    node_id varchar(70)
 );
 
 

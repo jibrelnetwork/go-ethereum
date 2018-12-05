@@ -1338,7 +1338,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	for i := len(newChain) - 1; i >= 0; i-- {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
-		extdb.ReinsertBlock(newChain[i].Hash(), newChain[i].NumberU64())
+		extdb.ReinsertBlock(newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
 		extdb.NewReinsertNotify(newChain[i].Hash())
 		// write lookup entries for hash based transaction/receipt searches
 		if err := WriteTxLookupEntries(bc.db, newChain[i]); err != nil {
