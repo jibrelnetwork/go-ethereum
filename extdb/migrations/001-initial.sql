@@ -1,73 +1,73 @@
 CREATE TABLE headers (
-    block_number bigint,
-    block_hash varchar(70) UNIQUE,
+    block_number bigint NOT NULL,
+    block_hash varchar(70) UNIQUE NOT NULL,
     fields jsonb
 );
 
 CREATE TABLE bodies (
-    block_number bigint,
-    block_hash varchar(70) UNIQUE,
+    block_number bigint NOT NULL,
+    block_hash varchar(70) UNIQUE NOT NULL,
     fields jsonb
 );
 
 CREATE TABLE pending_transactions (
-    tx_hash varchar(70) UNIQUE,
+    tx_hash varchar(70) UNIQUE NOT NULL,
     status varchar,
     fields jsonb
 );
 
 CREATE TABLE receipts (
-    block_number bigint,
-    block_hash varchar(70) UNIQUE,
+    block_number bigint NOT NULL,
+    block_hash varchar(70) UNIQUE NOT NULL,
     fields jsonb
 );
 
 CREATE TABLE accounts (
     id bigserial primary key,
-    block_number bigint,
-    block_hash varchar(70),
-    address varchar(45),
+    block_number bigint NOT NULL,
+    block_hash varchar(70) NOT NULL,
+    address varchar(45) NOT NULL,
     fields jsonb,
     UNIQUE(block_hash, address)
 );
 
 CREATE TABLE rewards (
     id bigserial primary key,
-    block_number bigint,
-    block_hash varchar(70) UNIQUE,
-    address varchar(45),
+    block_number bigint NOT NULL,
+    block_hash varchar(70) UNIQUE NOT NULL,
+    address varchar(45) NOT NULL,
     fields jsonb
 );
 
 CREATE TABLE internal_transactions (
     id bigserial primary key,
-    block_number bigint,
-    block_hash varchar(70),
-    parent_tx_hash varchar(70),
-    index bigint,
-    type varchar(20),
-    timestamp bigint,
+    block_number bigint NOT NULL,
+    block_hash varchar(70) NOT NULL,
+    parent_tx_hash varchar(70) NOT NULL,
+    index bigint NOT NULL,
+    type varchar(20) NOT NULL,
+    timestamp bigint NOT NULL,
     fields jsonb
 );
 
 CREATE TABLE chain_splits (
     id bigserial primary key,
-    common_block_number bigint,
-    common_block_hash varchar(70),
-    drop_length bigint,
-    drop_block_hash varchar(70),
-    add_length bigint,
-    add_block_hash varchar(70),
-    node_id varchar(70)
+    common_block_number bigint NOT NULL,
+    common_block_hash varchar(70) NOT NULL,
+    drop_length bigint NOT NULL,
+    drop_block_hash varchar(70) NOT NULL,
+    add_length bigint NOT NULL,
+    add_block_hash varchar(70) NOT NULL,
+    node_id varchar(70) NOT NULL
 );
 
 CREATE TABLE reorgs (
     id bigserial primary key,
-    block_number bigint,
-    block_hash varchar(70),
+    block_number bigint NOT NULL,
+    block_hash varchar(70) NOT NULL,
     header jsonb,
-    reinserted boolean,
-    node_id varchar(70)
+    reinserted boolean NOT NULL,
+    node_id varchar(70) NOT NULL
 );
 
 
