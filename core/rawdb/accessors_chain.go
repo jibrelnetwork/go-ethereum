@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -232,6 +233,9 @@ func WriteHeader(db ethdb.KeyValueWriter, header *types.Header) {
 	// Write the hash -> number mapping
 	WriteHeaderNumber(db, hash, number)
 
+	if err := extdb.WriteBlockHeader(hash, number, header); err != nil {
+		log.Crit("Failed to store header in extern db", "err", err)
+	}
 	// Write the encoded header
 	data, err := rlp.EncodeToBytes(header)
 	if err != nil {
