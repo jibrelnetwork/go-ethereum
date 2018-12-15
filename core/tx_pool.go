@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -610,6 +611,8 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		pool.journalTx(from, tx)
 		pool.queueTxEvent(tx)
 		log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
+
+		extdb.WritePendingTransaction(tx.Hash(), tx);
 		return old != nil, nil
 	}
 	// New transaction isn't replacing a pending one, push into queue
@@ -715,6 +718,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	pool.beats[addr] = time.Now()
 	pool.pendingNonces.set(addr, tx.Nonce()+1)
 
+	extdb.WritePendingTransaction(tx.Hash(), tx);
 	return true
 }
 
