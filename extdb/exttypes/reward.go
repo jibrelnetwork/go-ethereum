@@ -15,7 +15,7 @@ type UncleReward struct {
 
 type BlockReward struct {
 	BlockNumber          *big.Int
-	TimeStamp            *big.Int
+	TimeStamp            uint64
 	BlockMiner           common.Address
 	Uncles               []*UncleReward
 	BlockReward          *big.Int

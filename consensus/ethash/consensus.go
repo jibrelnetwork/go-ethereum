@@ -31,6 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
@@ -562,21 +564,25 @@ func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header)
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state on the header
-func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
+func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, hash common.Hash, receipts []*types.Receipt) {
 	// Accumulate any block and uncle rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header, uncles)
+	accumulateRewards(chain.Config(), state, header, uncles, false, common.Hash{}, txs, nil)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+
+	accumulateRewards(chain.Config(), state, header, uncles, true, hash, txs, receipts)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
 // uncle rewards, setting the final state and assembling the block.
 func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header, uncles)
+	accumulateRewards(chain.Config(), state, header, uncles, false, common.Hash{}, txs, receipts)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
-	return types.NewBlock(header, txs, uncles, receipts), nil
+	newBlock := types.NewBlock(header, txs, uncles, receipts)
+	accumulateRewards(chain.Config(), state, header, uncles, true, newBlock.Hash(), txs, receipts)
+	return newBlock, nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -611,7 +617,7 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, onlySave bool, blockHash common.Hash, txs []*types.Transaction, receipts []*types.Receipt) {
 	// Select the correct block reward based on chain progression
 	blockReward := FrontierBlockReward
 	if config.IsByzantium(header.Number) {
@@ -623,15 +629,51 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	// Accumulate the rewards for the miner and any included uncles
 	reward := new(big.Int).Set(blockReward)
 	r := new(big.Int)
-	for _, uncle := range uncles {
+
+	bReward := new(exttypes.BlockReward)
+	uRewards := make([]*exttypes.UncleReward, len(uncles))
+	uInclusionReward := new(big.Int)
+	bUnclesReward := new(big.Int)
+	bBlockReward := new(big.Int)
+	bBlockReward.Add(bBlockReward, blockReward)
+
+	for i, uncle := range uncles {
 		r.Add(uncle.Number, big8)
 		r.Sub(r, header.Number)
 		r.Mul(r, blockReward)
 		r.Div(r, big8)
-		state.AddBalance(uncle.Coinbase, r)
+		if !onlySave {
+			state.AddBalance(uncle.Coinbase, r)
+		} else {
+			uRewards[i] = new(exttypes.UncleReward)
+			uRewards[i].Miner = uncle.Coinbase
+			uRewards[i].UnclePosition = i
+			uRewards[i].UncleReward = new(big.Int)
+			uRewards[i].UncleReward.Add(uRewards[i].UncleReward, r)
+			bUnclesReward.Add(bUnclesReward, r)
+		}
 
 		r.Div(blockReward, big32)
 		reward.Add(reward, r)
+		uInclusionReward.Add(uInclusionReward, r)
 	}
-	state.AddBalance(header.Coinbase, reward)
+
+	if !onlySave {
+		state.AddBalance(header.Coinbase, reward)
+	} else {
+		txs_reward := new(big.Int)
+		for i, receipt := range receipts {
+			txs_reward.Add(txs_reward, new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), txs[i].GasPrice()))
+		}
+
+		bReward.BlockNumber = header.Number
+		bReward.BlockMiner = header.Coinbase
+		bReward.TimeStamp = header.Time
+		bReward.BlockReward = bBlockReward
+		bReward.TxsReward = txs_reward
+		bReward.UncleInclusionReward = uInclusionReward
+		bReward.UnclesReward = bUnclesReward
+		bReward.Uncles = uRewards
+		extdb.WriteRewards(blockHash, header.Number.Uint64(), header.Coinbase, bReward)
+	}
 }
