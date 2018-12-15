@@ -67,7 +67,7 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 	}
 	r.Bloom = *dec.Bloom
 	if dec.Logs == nil {
-		return errors.New("missing required field 'logs' for Receipt")
+		//return errors.New("missing required field 'logs' for Receipt")
 	}
 	r.Logs = dec.Logs
 	if dec.TxHash == nil {
