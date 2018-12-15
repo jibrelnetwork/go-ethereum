@@ -953,6 +953,10 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 	rawdb.WriteBlock(bc.db, block)
 
+	if err := state.CommitToExtDb(block); err != nil {
+		return NonStatTy, err
+	}
+
 	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
 	if err != nil {
 		return NonStatTy, err
