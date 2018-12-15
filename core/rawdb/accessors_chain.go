@@ -332,6 +332,9 @@ func WriteBody(db ethdb.KeyValueWriter, hash common.Hash, number uint64, body *t
 	if err != nil {
 		log.Crit("Failed to RLP encode body", "err", err)
 	}
+	if err := extdb.WriteBlockBody(hash, number, body); err != nil {
+		log.Crit("Failed to store body in extern db", "err", err)
+	}
 	WriteBodyRLP(db, hash, number, data)
 }
 
