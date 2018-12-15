@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -1693,6 +1694,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
+			
+			extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
+			extdb.NewReorgNotify(block.Hash())
+			
 			events = append(events, ChainSideEvent{block})
 
 		default:
@@ -1950,6 +1955,9 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
 		blockReorgAddMeter.Mark(int64(len(newChain)))
 		blockReorgDropMeter.Mark(int64(len(oldChain)))
+
+		extdb.WriteChainSplit(commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
+		extdb.NewChainSplitNotify(commonBlock.Hash())
 	} else {
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -1961,6 +1969,9 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 
 		// Collect reborn logs due to chain reorg
 		collectLogs(newChain[i].Hash(), false)
+
+		extdb.ReinsertBlock(newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
+		extdb.NewReinsertNotify(newChain[i].Hash())
 
 		// Write lookup entries for hash based transaction/receipt searches
 		rawdb.WriteTxLookupEntries(bc.db, newChain[i])
@@ -1998,6 +2009,9 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		}
 		if len(oldChain) > 0 {
 			for _, block := range oldChain {
+				extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
+				extdb.NewReorgNotify(block.Hash())
+				
 				bc.chainSideFeed.Send(ChainSideEvent{Block: block})
 			}
 		}
