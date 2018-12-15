@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -759,4 +760,32 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		}
 		return nil
 	})
+}
+
+// CommitToExtDb writes the state to the extern database.
+func (s *StateDB) CommitToExtDb(block *types.Block) error {
+	start := time.Now()
+	// Commit objects to the extern db.
+	for addr, stateObject := range s.stateObjects {
+		_, isDirty := s.stateObjectsDirty[addr]
+		log.Debug("ExtDB Write state", "Addr", addr, "Block", block.Number().Uint64())
+		switch {
+		case stateObject.suicided:
+			log.Debug("ExtDB DeleteStateObject")
+			if err := extdb.DeleteStateObject(block.Hash(), block.Number().Uint64(), addr); err != nil {
+				return err
+			}
+		case isDirty:
+			dump_start := time.Now()
+			dumpAccount, _ := s.RawDumpStateObject(stateObject)
+			log.Debug("ExtDB RawDumpStateObject", "time", time.Since(dump_start), "addr", addr)
+			dumpAccount.Storage = nil
+			if err := extdb.WriteStateObject(block.Hash(), block.Number().Uint64(), addr, dumpAccount); err != nil {
+				return err
+			}
+		}
+	}
+	// Write trie changes.
+	log.Debug("ExtDB CommitToExtDB total", "time", time.Since(start))
+	return nil
 }

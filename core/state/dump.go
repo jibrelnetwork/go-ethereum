@@ -156,3 +156,25 @@ func (self *StateDB) Dump(excludeCode, excludeStorage, excludeMissingPreimages b
 func (self *StateDB) IterativeDump(excludeCode, excludeStorage, excludeMissingPreimages bool, output *json.Encoder) {
 	self.dump(iterativeDump(*output), excludeCode, excludeStorage, excludeMissingPreimages)
 }
+
+func (self *StateDB) RawDumpStateObject(obj *stateObject) (DumpAccount, error) {
+	account := DumpAccount{
+		Balance:  obj.data.Balance.String(),
+		Nonce:    obj.data.Nonce,
+		Root:     common.Bytes2Hex(obj.data.Root[:]),
+		CodeHash: common.Bytes2Hex(obj.data.CodeHash),
+		Code:     common.Bytes2Hex(obj.Code(self.db)),
+		Storage:  nil,
+	}
+	// storageIt := trie.NewIterator(obj.getTrie(self.db).NodeIterator(nil))
+	// for storageIt.Next() {
+	// 	account.Storage[common.Bytes2Hex(self.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(storageIt.Value)
+	// }
+	// json, err := json.MarshalIndent(account, "", "    ")
+	// if err != nil {
+	// 	fmt.Println("obj dump err", err)
+	// 	return nil, err
+	// }
+
+	return account, nil
+}
