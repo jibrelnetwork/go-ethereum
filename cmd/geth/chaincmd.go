@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -69,6 +70,7 @@ It expects the genesis file as argument.`,
 			utils.GCModeFlag,
 			utils.CacheDatabaseFlag,
 			utils.CacheGCFlag,
+			extdb.ExtDbUriFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `
@@ -208,6 +210,7 @@ func importChain(ctx *cli.Context) error {
 	if len(ctx.Args()) < 1 {
 		utils.Fatalf("This command requires an argument.")
 	}
+	extdb.NewExtDBpg(ctx.GlobalString("extdb"))
 	stack := makeFullNode(ctx)
 	chain, chainDb := utils.MakeChain(ctx, stack)
 	defer chainDb.Close()
