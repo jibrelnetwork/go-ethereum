@@ -23,6 +23,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -79,6 +81,7 @@ type Context struct {
 	GetHash GetHashFunc
 
 	// Message information
+	ParentTxHash common.Hash
 	Origin   common.Address // Provides information for ORIGIN
 	GasPrice *big.Int       // Provides information for GASPRICE
 
@@ -86,6 +89,7 @@ type Context struct {
 	Coinbase    common.Address // Provides information for COINBASE
 	GasLimit    uint64         // Provides information for GASLIMIT
 	BlockNumber *big.Int       // Provides information for NUMBER
+	BlockHash   common.Hash    // Provides information for HASH
 	Time        *big.Int       // Provides information for TIME
 	Difficulty  *big.Int       // Provides information for DIFFICULTY
 }
@@ -106,6 +110,8 @@ type EVM struct {
 	StateDB StateDB
 	// Depth is the current call stack
 	depth int
+	// Index is the current internal transaction index
+	index int
 
 	// chainConfig contains information about the current chain
 	chainConfig *params.ChainConfig
@@ -226,6 +232,32 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 
 		defer func() { // Lazy evaluation of the parameters
 			evm.vmConfig.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
+		}()
+	}
+	if evm.depth > 0 {
+		defer func() {
+			evm.index++
+			intTransactionFrom := caller.Address()
+			intTransactionTo := addr
+			intTransaction := new(exttypes.InternalTransaction)
+			intTransaction.BlockNumber = evm.Context.BlockNumber
+			intTransaction.BlockHash = evm.Context.BlockHash
+			intTransaction.TimeStamp = evm.Time
+			intTransaction.From = &intTransactionFrom
+			intTransaction.To = &intTransactionTo
+			intTransaction.Value = value
+			intTransaction.GasLimit = gas
+			intTransaction.CallDepth = evm.depth
+			intTransaction.Operation = "call"
+			intTransaction.ParentTxHash = evm.Context.ParentTxHash
+			intTransaction.Payload = input
+			intTransaction.Index = evm.index
+			if err != nil {
+				intTransaction.Status = err.Error()
+			} else {
+				intTransaction.Status = "success"
+			}
+			extdb.WriteInternalTransaction(intTransaction)
 		}()
 	}
 	ret, err = run(evm, contract, input, false)
@@ -409,9 +441,36 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.vmConfig.Debug && evm.depth == 0 {
 		evm.vmConfig.Tracer.CaptureStart(caller.Address(), address, true, codeAndHash.code, gas, value)
 	}
+
 	start := time.Now()
 
 	ret, err := run(evm, contract, nil, false)
+
+	if evm.depth > 0 {
+		defer func() {
+			evm.index++
+			intTransactionFrom := caller.Address()
+			intTransactionTo := address
+			intTransaction := new(exttypes.InternalTransaction)
+			intTransaction.BlockNumber = evm.Context.BlockNumber
+			intTransaction.BlockHash = evm.Context.BlockHash
+			intTransaction.TimeStamp = evm.Time
+			intTransaction.From = &intTransactionFrom
+			intTransaction.To = &intTransactionTo
+			intTransaction.Value = value
+			intTransaction.GasLimit = gas
+			intTransaction.CallDepth = evm.depth
+			intTransaction.Operation = "create"
+			intTransaction.ParentTxHash = evm.Context.ParentTxHash
+			intTransaction.Index = evm.index
+			if err != nil {
+				intTransaction.Status = err.Error()
+			} else {
+				intTransaction.Status = "success"
+			}
+			extdb.WriteInternalTransaction(intTransaction)
+		}()
+	}
 
 	// check whether the max code size has been exceeded
 	maxCodeSizeExceeded := evm.ChainConfig().IsEIP158(evm.BlockNumber) && len(ret) > params.MaxCodeSize
