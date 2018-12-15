@@ -43,6 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
 	cli "gopkg.in/urfave/cli.v1"
+	"github.com/ethereum/go-ethereum/extdb"
 )
 
 const (
@@ -146,6 +147,7 @@ var (
 		utils.EWASMInterpreterFlag,
 		utils.EVMInterpreterFlag,
 		configFileFlag,
+		extdb.ExtDbUriFlag,
 	}
 
 	rpcFlags = []cli.Flag{
@@ -315,6 +317,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	debug.Memsize.Add("node", stack)
 
 	// Start up the node itself
+	extdb.NewExtDBpg(ctx.GlobalString("extdb"))
 	utils.StartNode(stack)
 
 	// Unlock any account specifically requested
