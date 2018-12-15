@@ -1217,7 +1217,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.usedGas += usedGas
 
 		cache, _ := bc.stateCache.TrieDB().Size()
+
 		stats.report(chain, i, cache)
+		extdb.NewBlockNotify(block.Hash())
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
