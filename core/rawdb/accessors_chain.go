@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -502,6 +503,9 @@ func ReadReceipts(db ethdb.Reader, hash common.Hash, number uint64, config *para
 func WriteReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64, receipts types.Receipts) {
 	// Convert the receipts into their storage form and serialize them
 	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
+	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
+		log.Crit("Failed to store transaction receipts in extern db", "err", err)
+	}
 	for i, receipt := range receipts {
 		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
 	}
