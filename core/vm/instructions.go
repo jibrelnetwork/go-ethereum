@@ -26,6 +26,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/exttypes"
 )
 
 var (
@@ -880,9 +882,32 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory 
 
 func opSuicide(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	balance := interpreter.evm.StateDB.GetBalance(contract.Address())
-	interpreter.evm.StateDB.AddBalance(common.BigToAddress(stack.pop()), balance)
+
+	addressTo := common.BigToAddress(stack.pop())
+	interpreter.evm.StateDB.AddBalance(addressTo, balance)
 
 	interpreter.evm.StateDB.Suicide(contract.Address())
+
+	defer func() {
+		interpreter.evm.index++
+		intTransactionTo := addressTo
+		intTransactionFrom := contract.Address()
+		intTransaction := new(exttypes.InternalTransaction)
+		intTransaction.BlockNumber = interpreter.evm.Context.BlockNumber
+		intTransaction.BlockHash = interpreter.evm.Context.BlockHash
+		intTransaction.TimeStamp = interpreter.evm.Time
+		intTransaction.From = &intTransactionFrom
+		intTransaction.To = &intTransactionTo
+		intTransaction.Value = balance
+		intTransaction.GasLimit = interpreter.evm.callGasTemp
+		intTransaction.CallDepth = interpreter.evm.depth
+		intTransaction.Operation = "suicide"
+		intTransaction.ParentTxHash = interpreter.evm.Context.ParentTxHash
+		intTransaction.Index = interpreter.evm.index
+		intTransaction.Status = "success"
+		extdb.WriteInternalTransaction(intTransaction)
+	}()
+
 	return nil, nil
 }
 
