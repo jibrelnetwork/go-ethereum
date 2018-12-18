@@ -1072,6 +1072,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		lastCanon     *types.Block
 		coalescedLogs []*types.Log
 	)
+	extdb.ResetDbWriteDuration()
 	// Start the parallel header verifier
 	headers := make([]*types.Header, len(chain))
 	seals := make([]bool, len(chain))
@@ -1234,6 +1235,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
 		events = append(events, ChainHeadEvent{lastCanon})
 	}
+	extdb.ResetDbWriteDuration()
 	return 0, events, coalescedLogs, nil
 }
 
@@ -1267,6 +1269,7 @@ func (st *insertStats) report(chain []*types.Block, index int, cache common.Stor
 			"blocks", st.processed, "txs", txs, "mgas", float64(st.usedGas) / 1000000,
 			"elapsed", common.PrettyDuration(elapsed), "mgasps", float64(st.usedGas) * 1000 / float64(elapsed),
 			"number", end.Number(), "hash", end.Hash(),
+			"dbwrite", common.PrettyDuration(extdb.GetDbWriteDuration()),
 		}
 		if timestamp := time.Unix(end.Time().Int64(), 0); time.Since(timestamp) > time.Minute {
 			context = append(context, []interface{}{"age", common.PrettyAge(timestamp)}...)
