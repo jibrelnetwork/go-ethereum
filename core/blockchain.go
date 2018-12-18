@@ -1474,6 +1474,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		lastCanon     *types.Block
 		coalescedLogs []*types.Log
 	)
+	extdb.ResetDbWriteDuration()
 	// Start the parallel header verifier
 	headers := make([]*types.Header, len(chain))
 	seals := make([]bool, len(chain))
@@ -1735,6 +1736,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
 		events = append(events, ChainHeadEvent{lastCanon})
 	}
+	extdb.ResetDbWriteDuration()
 	return it.index, events, coalescedLogs, err
 }
 

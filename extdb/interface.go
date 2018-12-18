@@ -2,6 +2,7 @@ package extdb
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/log"
@@ -25,6 +26,8 @@ type ExtDB interface {
 	NewReorgNotify(blockHash common.Hash) error
 	NewChainSplitNotify(commonHash common.Hash) error
 	NewReinsertNotify(blockHash common.Hash) error
+	GetDbWriteDuration() mclock.AbsTime
+	ResetDbWriteDuration() error
 }
 
 var (
@@ -167,4 +170,18 @@ func NewReinsertNotify(blockHash common.Hash) error {
 		}
 	}
 	return nil
+}
+
+func ResetDbWriteDuration() error {
+	if db != nil {
+		db.ResetDbWriteDuration()
+	}
+	return nil
+}
+
+func GetDbWriteDuration() mclock.AbsTime {
+	if db != nil {
+		return db.GetDbWriteDuration()
+	}
+	return mclock.AbsTime(0)
 }
