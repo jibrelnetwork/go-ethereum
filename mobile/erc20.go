@@ -189,6 +189,7 @@ func (abi *ContractABI) UnpackTransfer(logWrapper *Log) (*TransferEvent, error) 
 	if err != nil {
 		return nil, err
 	}
+	event.Raw = *logWrapper.log
 	return &TransferEvent{event}, nil
 }
 
