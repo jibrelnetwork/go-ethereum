@@ -58,7 +58,7 @@ CREATE TABLE chain_splits (
     drop_block_hash varchar(70) NOT NULL,
     add_length bigint NOT NULL,
     add_block_hash varchar(70) NOT NULL,
-    node_id varchar(70) NOT NULL
+    node_id varchar(70)
 );
 
 CREATE TABLE reorgs (
@@ -67,7 +67,7 @@ CREATE TABLE reorgs (
     block_hash varchar(70) NOT NULL,
     header jsonb,
     reinserted boolean NOT NULL,
-    node_id varchar(70) NOT NULL
+    node_id varchar(70)
 );
 
 
