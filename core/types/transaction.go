@@ -143,10 +143,12 @@ func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
 // MarshalJSON encodes the web3 RPC transaction format.
 func (tx *Transaction) MarshalJSON() ([]byte, error) {
 	hash := tx.Hash()
-	sigCache := tx.from.Load().(SigCache)
 	data := tx.data
 	data.Hash = &hash
-	data.From = &sigCache.from
+	if sc := tx.from.Load(); sc != nil {
+		sigCache := tx.from.Load().(SigCache)
+		data.From = &sigCache.from
+	}
 	return data.MarshalJSON()
 }
 
