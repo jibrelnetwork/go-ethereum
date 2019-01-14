@@ -246,50 +246,6 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 	return err
 }
 
-func (self *ExtDBpg) NewBlockNotify(blockHash common.Hash) error {
-	var query = `select pg_notify('newblock', CAST($1 AS text));`
-	start := mclock.Now()
-	_, err := self.conn.Exec(query, blockHash)
-	log.Debug("ExtDB new block notify", "time", common.PrettyDuration(mclock.Now() - start))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (self *ExtDBpg) NewReorgNotify(blockHash common.Hash) error {
-	var query = `select pg_notify('newreorg', CAST($1 AS text));`
-	start := mclock.Now()
-	_, err := self.conn.Exec(query, blockHash.Hex())
-	log.Debug("ExtDB new reorg notify", "time", common.PrettyDuration(mclock.Now() - start))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (self *ExtDBpg) NewChainSplitNotify(commonHash common.Hash) error {
-	var query = `select pg_notify('newsplit', CAST($1 AS text));`
-	start := mclock.Now()
-	_, err := self.conn.Exec(query, commonHash.Hex())
-	log.Debug("ExtDB new chain split notify", "time", common.PrettyDuration(mclock.Now() - start))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (self *ExtDBpg) NewReinsertNotify(blockHash common.Hash) error {
-	var query = `select pg_notify('newreinsert', CAST($1 AS text));`
-	start := mclock.Now()
-	_, err := self.conn.Exec(query, blockHash.Hex())
-	log.Debug("ExtDB new reinsert block notify", "time", common.PrettyDuration(mclock.Now() - start))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (self *ExtDBpg) ResetDbWriteDuration() error {
 	self.writeDuration = mclock.AbsTime(0)
 	return nil
