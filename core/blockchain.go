@@ -1219,7 +1219,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			blockInsertTimer.UpdateSince(bstart)
 			
 			extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
-			extdb.NewReorgNotify(block.Hash())
 
 			events = append(events, ChainSideEvent{block})
 		}
@@ -1229,7 +1228,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		cache, _ := bc.stateCache.TrieDB().Size()
 
 		stats.report(chain, i, cache)
-		extdb.NewBlockNotify(block.Hash())
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1375,7 +1373,6 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		logFn("Chain split detected", "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
 		extdb.WriteChainSplit(commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
-		extdb.NewChainSplitNotify(commonBlock.Hash())
 	} else {
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -1385,7 +1382,6 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
 		extdb.ReinsertBlock(newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
-		extdb.NewReinsertNotify(newChain[i].Hash())
 		// write lookup entries for hash based transaction/receipt searches
 		rawdb.WriteTxLookupEntries(bc.db, newChain[i])
 		addedTxs = append(addedTxs, newChain[i].Transactions()...)
@@ -1407,7 +1403,6 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		go func() {
 			for _, block := range oldChain {
 				extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
-				extdb.NewReorgNotify(block.Hash())
 				
 				bc.chainSideFeed.Send(ChainSideEvent{Block: block})
 			}
