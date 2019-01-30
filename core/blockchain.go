@@ -1751,7 +1751,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	}
 	stats.ignored += it.remaining()
 
-	extdb.ResetDbWriteDuration()
 	return it.index, err
 }
 
