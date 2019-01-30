@@ -1,9 +1,11 @@
 package extdb
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"regexp"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -11,11 +13,54 @@ import (
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/log"
 	_ "github.com/lib/pq"
+	"github.com/segmentio/kafka-go"
 )
 
 type ExtDBpg struct {
 	conn *sql.DB
 	writeDuration mclock.AbsTime
+}
+
+var (
+	writer_headers *kafka.Writer               = nil
+	writer_bodies *kafka.Writer                = nil
+	writer_pending_transactions *kafka.Writer  = nil
+	writer_receipts *kafka.Writer              = nil
+	writer_accounts *kafka.Writer              = nil
+	writer_rewards *kafka.Writer               = nil
+	writer_internal_transactions *kafka.Writer = nil
+	writer_hain_splits *kafka.Writer           = nil
+	writer_reorgs *kafka.Writer                = nil
+)
+
+// example: writer_headers, _ = Configure([]string{"127.0.0.1:39092"}, "1", "headers")
+func Configure(kafkaBrokerUrls []string, clientId string, topic string) (w *kafka.Writer, err error) {
+	dialer := &kafka.Dialer{
+		Timeout:  10 * time.Second,
+		ClientID: clientId,
+	}
+
+	config := kafka.WriterConfig{
+		Brokers:          kafkaBrokerUrls,
+		Topic:            topic,
+		Balancer:         &kafka.LeastBytes{},
+		Dialer:           dialer,
+		WriteTimeout:     10 * time.Second,
+		ReadTimeout:      10 * time.Second,
+		CompressionCodec: nil,
+	}
+	w = kafka.NewWriter(config)
+	return w, nil
+}
+
+// example: Push(context.Background(), writer_headers, nil, []byte(fieldsString))
+func Push(parent context.Context, writer *kafka.Writer, key, value []byte) error {
+	message := kafka.Message{
+		Key:   key,
+		Value: value,
+		Time:  time.Now(),
+	}
+	return writer.WriteMessages(parent, message)
 }
 
 func NewExtDBpg(dbURI string) error {
