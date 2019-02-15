@@ -279,7 +279,7 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 	start := mclock.Now()
 	log.Debug("ExtDB write chain split", "common hash", common_block_hash, "common number", common_block_number, "drop length", drop_length, "drop hash", drop_block_hash, "add length", add_length)
 
-	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING"
+	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash) VALUES ($1, $2, $3, $4, $5, $6, '1') ON CONFLICT DO NOTHING"
 	_, err := self.conn.Exec(query, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex())
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
