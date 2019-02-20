@@ -237,15 +237,19 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 	return nil
 }
 
-func (self *ExtDBpg) WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+func (self *ExtDBpg) WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	start := mclock.Now()
 	log.Debug("ExtDB write block reorg", "hash", blockHash, "number", blockNumber)
 
 	headerString, err := self.SerializeHeaderFields(header)
 	log.Debug("ExtDB header serialization reorg", "time", common.PrettyDuration(mclock.Now() - start))
 	start = mclock.Now()
-	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, node_id) VALUES ($1, $2, $3, false, '1') ON CONFLICT DO NOTHING;"
-	_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString)
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, node_id, split_id) VALUES ($1, $2, $3, false, '1', $4) ON CONFLICT DO NOTHING;"
+	if tx != nil {
+		_, err = tx.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+	} else {
+		_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+	}
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB reorg insertion", "time", common.PrettyDuration(query_duration))
@@ -256,15 +260,19 @@ func (self *ExtDBpg) WriteReorg(blockHash common.Hash, blockNumber uint64, heade
 	return err
 }
 
-func (self *ExtDBpg) ReinsertBlock(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+func (self *ExtDBpg) ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	start := mclock.Now()
 	log.Debug("ExtDB reinsert block", "hash", blockHash, "number", blockNumber)
 
 	headerString, err := self.SerializeHeaderFields(header)
 	log.Debug("ExtDB header serialization reinsert block", "time", common.PrettyDuration(mclock.Now() - start))
 	start = mclock.Now()
-	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, node_id) VALUES ($1, $2, $3, true, '1') ON CONFLICT DO NOTHING;"
-	_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString)
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, node_id, split_id) VALUES ($1, $2, $3, true, '1', $4) ON CONFLICT DO NOTHING;"
+	if tx != nil {
+		_, err = tx.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+	} else {
+		_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+	}
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB reinsert block insertion", "time", common.PrettyDuration(query_duration))
@@ -275,12 +283,23 @@ func (self *ExtDBpg) ReinsertBlock(blockHash common.Hash, blockNumber uint64, he
 	return err
 }
 
-func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error {
+func (self *ExtDBpg) WriteChainSplit(tx *sql.Tx, common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) (int, error) {
 	start := mclock.Now()
 	log.Debug("ExtDB write chain split", "common hash", common_block_hash, "common number", common_block_number, "drop length", drop_length, "drop hash", drop_block_hash, "add length", add_length)
 
-	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash) VALUES ($1, $2, $3, $4, $5, $6, '1') ON CONFLICT DO NOTHING"
-	_, err := self.conn.Exec(query, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex())
+	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id"
+	
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		log.Warn("ExtDB Error prepare write chain split query", "Error", err)
+		return 0, err
+	}
+
+	defer stmt.Close()
+
+	var chain_split_id int
+	err = stmt.QueryRow(common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), "1").Scan(&chain_split_id)
+
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB chain split insertion", "time", common.PrettyDuration(query_duration))
@@ -288,7 +307,22 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 	if err != nil {
 		log.Warn("ExtDB Error writing chain split to extern DB", "Error", err)
 	}
-	return err
+	return chain_split_id, err
+}
+
+func (self *ExtDBpg) BeginTx() (*sql.Tx, error) {
+	tx, err := self.conn.BeginTx(context.Background(), nil)
+	return tx, err
+}
+
+func (self *ExtDBpg) CloseTx(tx *sql.Tx, commit bool) error {
+	if commit {
+		err := tx.Commit()
+		return err
+	} else {
+		err := tx.Rollback()
+		return err
+	  }
 }
 
 func (self *ExtDBpg) ResetDbWriteDuration() error {
