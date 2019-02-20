@@ -1718,8 +1718,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 				"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
-			
-			extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
+				
+			extdb.WriteReorg(nil, 0, block.Hash(), block.Number().Uint64(), block.Header())
 
 		default:
 			// This in theory is impossible, but lets be nice to our future selves and leave
@@ -1981,6 +1981,10 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			return fmt.Errorf("invalid new chain")
 		}
 	}
+
+	tx, err := extdb.BeginTx()
+	var chain_split_id int
+
 	// Ensure the user sees large reorgs
 	if len(oldChain) > 0 && len(newChain) > 0 {
 		logFn := log.Info
@@ -1994,7 +1998,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		blockReorgAddMeter.Mark(int64(len(newChain)))
 		blockReorgDropMeter.Mark(int64(len(oldChain)))
 
-		extdb.WriteChainSplit(commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
+		chain_split_id, err = extdb.WriteChainSplit(tx, commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
 	} else {
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -2007,7 +2011,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		// Collect reborn logs due to chain reorg
 		collectLogs(newChain[i].Hash(), false)
 
-		extdb.ReinsertBlock(newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
+		extdb.ReinsertBlock(tx, chain_split_id, newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
 
 		// Write lookup entries for hash based transaction/receipt searches
 		rawdb.WriteTxLookupEntries(bc.db, newChain[i])
@@ -2029,6 +2033,13 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		rawdb.DeleteCanonicalHash(batch, i)
 	}
 	batch.Write()
+
+	if len(oldChain) > 0 {
+		for _, block := range oldChain {
+			extdb.WriteReorg(tx, chain_split_id, block.Hash(), block.Number().Uint64(), block.Header())
+		}
+	}
+
 	// If any logs need to be fired, do it now. In theory we could avoid creating
 	// this goroutine if there are no events to fire, but realistcally that only
 	// ever happens if we're reorging empty blocks, which will only happen on idle
@@ -2041,11 +2052,16 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	}
 	if len(oldChain) > 0 {
 		for i := len(oldChain) - 1; i >= 0; i-- {
-			extdb.WriteReorg(block.Hash(), block.Number().Uint64(), block.Header())
-
 			bc.chainSideFeed.Send(ChainSideEvent{Block: oldChain[i]})
 		}
 	}
+
+	if err != nil {
+		extdb.CloseTx(tx, false)
+	} else {
+		extdb.CloseTx(tx, true)
+	}
+
 	return nil
 }
 

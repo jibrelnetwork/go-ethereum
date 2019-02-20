@@ -50,6 +50,7 @@ require (
 	github.com/robertkrimen/otto v0.0.0-20170205013659-6a77b7cbc37d
 	github.com/rs/cors v0.0.0-20160617231935-a62a804a8a00
 	github.com/rs/xhandler v0.0.0-20160618193221-ed27b6fd6521 // indirect
+	github.com/segmentio/kafka-go v0.3.4
 	github.com/status-im/keycard-go v0.0.0-20190316090335-8537d3370df4
 	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
 	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
@@ -57,7 +58,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/tyler-smith/go-bip39 v1.0.1-0.20181017060643-dbb3b84ba2ef
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208
-	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+	golang.org/x/crypto v0.0.0-20190506204251-e1dfcc566284
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7
