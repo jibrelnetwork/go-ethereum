@@ -1,6 +1,8 @@
 package extdb
 
 import (
+	"database/sql"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -19,9 +21,11 @@ type ExtDB interface {
 	WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
 	WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
 	WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error
-	WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error
-	WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error
-	ReinsertBlock(blockHash common.Hash, blockNumber uint64, header *types.Header) error
+	WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error
+	WriteChainSplit(tx *sql.Tx, common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) (int, error)
+	ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error
+	BeginTx() (*sql.Tx, error)
+	CloseTx(tx *sql.Tx, commit bool) error
 	GetDbWriteDuration() mclock.AbsTime
 	ResetDbWriteDuration() error
 }
@@ -105,27 +109,40 @@ func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) erro
 	return nil
 }
 
-func WriteReorg(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+func WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	if db != nil {
-		if err := db.WriteReorg(blockHash, blockNumber, header); err != nil {
+		if err := db.WriteReorg(tx, split_id, blockHash, blockNumber, header); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func WriteChainSplit(common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) error {
+func WriteChainSplit(tx *sql.Tx, common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) (int, error) {
 	if db != nil {
-		if err := db.WriteChainSplit(common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash); err != nil {
-			return err
-		}
+		return db.WriteChainSplit(tx, common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash)
+	}
+	return 0, nil
+}
+
+func BeginTx() (*sql.Tx, error) {
+	if db != nil {
+		return db.BeginTx()
+	}
+	return nil, nil
+}
+
+func CloseTx(tx *sql.Tx, commit bool) error {
+	if db != nil {
+		return db.CloseTx(tx, commit)
 	}
 	return nil
 }
 
-func ReinsertBlock(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+
+func ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	if db != nil {
-		if err := db.ReinsertBlock(blockHash, blockNumber, header); err != nil {
+		if err := db.ReinsertBlock(tx, split_id, blockHash, blockNumber, header); err != nil {
 			return err
 		}
 	}
