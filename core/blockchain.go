@@ -1254,7 +1254,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
 			extdb.WriteReorg(nil, 0, block.Hash(), block.Number().Uint64(), block.Header())
-			log.Warn("ExtDB Write Reorg SideStatTy")
 			events = append(events, ChainSideEvent{block})
 		}
 		blockInsertTimer.UpdateSince(start)
