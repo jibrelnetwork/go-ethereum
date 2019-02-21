@@ -31,6 +31,12 @@ export PATH=$PATH:/usr/local/go/bin
 source ~/.profile
 ```
 
+Install Goose (is a database migration tool).
+
+```sh
+go get -u github.com/pressly/goose
+```
+
 ## Set up database
 
 ```
@@ -44,6 +50,11 @@ postgres=# GRANT ALL PRIVILEGES ON DATABASE jsearch TO jsearch;
 postgres=# \q
 ```
 
+## Init database
+
+```sh
+goose -dir  ~/go-ethereum/extdb/migrations/ postgres "user=DB_USER_NAME dbname=DB_NAME sslmode=disable" up
+```
 
 ## Clone project and create workdir
 
