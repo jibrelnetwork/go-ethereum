@@ -1,8 +1,35 @@
-version: '2'
+version: '3.7'
+
 services:
+
+  geth:
+    build:
+      context: .
+    command:
+      --cache 4096
+      --syncmode full
+      --gcmode full
+    environment:
+      POSTGRES_DB_HOST: rawdb
+      POSTGRES_DB_USER: jsearch
+      POSTGRES_DB_PASS: SuperSecretPassword
+    image: jibrelnetwork/go-ethereum:feature-postgres-db
+    volumes:
+      - geth-data:/root/.ethereum
+
+  rawdb:
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_DB: jsearch-raw
+      POSTGRES_USER: jsearch
+      POSTGRES_PASSWORD: SuperSecretPassword
+    image: postgres:9-alpine
+    volumes:
+      - rawdb-data:/var/lib/postgresql/data
+
   zk1:
     image: confluentinc/cp-zookeeper:3.0.1
-    ports: 
+    ports:
       - "22181:22181"
     environment:
       ZOOKEEPER_SERVER_ID: 1
@@ -26,7 +53,7 @@ services:
 
   zk3:
     image: confluentinc/cp-zookeeper:3.0.1
-    ports: 
+    ports:
       - "42181:42181"
     environment:
       ZOOKEEPER_SERVER_ID: 3
@@ -64,7 +91,7 @@ services:
 
   kafka-3:
     image: confluentinc/cp-kafka:3.0.1
-    ports: 
+    ports:
       - "39092:39092"
     depends_on:
       - zk1
@@ -74,3 +101,7 @@ services:
       KAFKA_BROKER_ID: 3
       KAFKA_ZOOKEEPER_CONNECT: ${MY_IP}:22181,${MY_IP}:32181,${MY_IP}:42181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${MY_IP}:39092
+
+volumes:
+  geth-data:
+  rawdb-data:
