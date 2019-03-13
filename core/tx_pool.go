@@ -687,7 +687,6 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 
 		log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
 
-		extdb.WritePendingTransaction(tx.Hash(), tx);
 		// We've directly injected a replacement transaction, notify subsystems
 		go pool.txFeed.Send(NewTxsEvent{types.Transactions{tx}})
 
@@ -787,7 +786,6 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	pool.beats[addr] = time.Now()
 	pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 
-	extdb.WritePendingTransaction(tx.Hash(), tx);
 	return true
 }
 
@@ -1278,6 +1276,8 @@ func (t *txLookup) Add(tx *types.Transaction) {
 	defer t.lock.Unlock()
 
 	t.all[tx.Hash()] = tx
+
+	extdb.WritePendingTransaction(tx.Hash(), tx, false);
 }
 
 // Remove removes a transaction from the lookup.
@@ -1286,4 +1286,6 @@ func (t *txLookup) Remove(hash common.Hash) {
 	defer t.lock.Unlock()
 
 	delete(t.all, hash)
+
+	extdb.WritePendingTransaction(hash, nil, true);
 }
