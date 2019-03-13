@@ -130,19 +130,19 @@ func (self *ExtDBpg) WriteBlockBody(blockHash common.Hash, blockNumber uint64, b
 	return nil
 }
 
-func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *types.Transaction) error {
+func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *types.Transaction, is_removed bool) error {
 	start := mclock.Now()
 	log.Debug("ExtDB write pending transaction", "tx_hash", txHash)
 
-	var query = `INSERT INTO pending_transactions (tx_hash, fields)
-                 VALUES ($1, $2)
-                 ON CONFLICT (tx_hash) DO UPDATE
-                 SET fields=excluded.fields;`
-
-	fieldsString, err := self.SerializeTransactionFields(transaction)
+	var query = `INSERT INTO pending_transactions (tx_hash, fields, removed, node_id) VALUES ($1, $2, $3, '1') ON CONFLICT DO NOTHING;`
+	var fieldsString = "{}"
+	var err error = nil
+	if transaction != nil {
+		fieldsString, err = self.SerializeTransactionFields(transaction)
+	}
 	log.Debug("ExtDB pending transaction serialization", "time", common.PrettyDuration(mclock.Now() - start))
 	start = mclock.Now()
-	_, err = self.conn.Exec(query, txHash.Hex(), fieldsString)
+	_, err = self.conn.Exec(query, txHash.Hex(), fieldsString, is_removed)
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB pending transaction insertion", "time", common.PrettyDuration(query_duration))
