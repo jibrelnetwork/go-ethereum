@@ -28,6 +28,7 @@ type ExtDB interface {
 	CloseTx(tx *sql.Tx, commit bool) error
 	GetDbWriteDuration() mclock.AbsTime
 	ResetDbWriteDuration() error
+	IsSkipConn() bool
 }
 
 var (
@@ -40,42 +41,42 @@ var (
 )
 
 func Close() error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.Close()
 	}
 	return nil
 }
 
 func WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.WriteBlockHeader(blockHash, blockNumber, header)
 	}
 	return nil
 }
 
 func WriteBlockBody(blockHash common.Hash, blockNumber uint64, body *types.Body) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.WriteBlockBody(blockHash, blockNumber, body)
 	}
 	return nil
 }
 
 func WritePendingTransaction(txHash common.Hash, transaction *types.Transaction, is_removed bool) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.WritePendingTransaction(txHash, transaction, is_removed)
 	}
 	return nil
 }
 
 func WriteReceipts(blockHash common.Hash, blockNumber uint64, receipts *exttypes.ReceiptsContainer) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.WriteReceipts(blockHash, blockNumber, receipts)
 	}
 	return nil
 }
 
 func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address, dumpAccount interface{}) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		if err := db.WriteStateObject(blockHash, blockNumber, address, dumpAccount); err != nil {
 			return err
 		}
@@ -84,7 +85,7 @@ func WriteStateObject(blockHash common.Hash, blockNumber uint64, address common.
 }
 
 func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common.Address) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		log.Debug("Stubbed delete state object in ext db", "Addr", address.Hex())
 	}
 	return nil
@@ -92,7 +93,7 @@ func DeleteStateObject(blockHash common.Hash, blockNumber uint64, address common
 }
 
 func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Address, blockReward *exttypes.BlockReward) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		if err := db.WriteRewards(blockHash, blockNumber, address, blockReward); err != nil {
 			return err
 		}
@@ -101,7 +102,7 @@ func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Addr
 }
 
 func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		if err := db.WriteInternalTransaction(intTransaction); err != nil {
 			return err
 		}
@@ -110,7 +111,7 @@ func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) erro
 }
 
 func WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		if err := db.WriteReorg(tx, split_id, blockHash, blockNumber, header); err != nil {
 			return err
 		}
@@ -119,21 +120,21 @@ func WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uin
 }
 
 func WriteChainSplit(tx *sql.Tx, common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) (int, error) {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.WriteChainSplit(tx, common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash)
 	}
 	return 0, nil
 }
 
 func BeginTx() (*sql.Tx, error) {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.BeginTx()
 	}
 	return nil, nil
 }
 
 func CloseTx(tx *sql.Tx, commit bool) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.CloseTx(tx, commit)
 	}
 	return nil
@@ -141,7 +142,7 @@ func CloseTx(tx *sql.Tx, commit bool) error {
 
 
 func ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		if err := db.ReinsertBlock(tx, split_id, blockHash, blockNumber, header); err != nil {
 			return err
 		}
@@ -150,14 +151,14 @@ func ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber 
 }
 
 func ResetDbWriteDuration() error {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		db.ResetDbWriteDuration()
 	}
 	return nil
 }
 
 func GetDbWriteDuration() mclock.AbsTime {
-	if db != nil {
+	if db != nil && !db.IsSkipConn() {
 		return db.GetDbWriteDuration()
 	}
 	return mclock.AbsTime(0)
