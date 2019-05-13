@@ -1958,6 +1958,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		blockReorgDropMeter.Mark(int64(len(oldChain)))
 
 		chain_split_id, err = extdb.WriteChainSplit(tx, commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
+		extdb.WriteChainEvent(0, common.Hash{0}, "split", commonBlock.NumberU64(), commonBlock.Hash(), len(oldChain), oldChain[0].Hash(), len(newChain), newChain[0].Hash())
 	} else {
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -1971,6 +1972,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		collectLogs(newChain[i].Hash(), false)
 
 		extdb.ReinsertBlock(tx, chain_split_id, newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
+		extdb.WriteChainEvent(newChain[i].NumberU64(), newChain[i].Hash(), "reinserted", 0, common.Hash{0}, 0, common.Hash{0}, 0, common.Hash{0})
 
 		// Write lookup entries for hash based transaction/receipt searches
 		rawdb.WriteTxLookupEntries(bc.db, newChain[i])

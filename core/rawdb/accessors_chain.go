@@ -451,6 +451,10 @@ func WriteReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64, rec
 	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
 		log.Crit("Failed to store transaction receipts in extern db", "err", err)
 	}
+
+	if err := extdb.WriteChainEvent(number, hash, "created", 0, common.Hash{0}, 0, common.Hash{0}, 0, common.Hash{0}); err != nil {
+		log.Crit("Failed to store chain event into extern db", "err", err)
+	}
 	for i, receipt := range receipts {
 		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
 	}
