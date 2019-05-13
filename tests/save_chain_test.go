@@ -1,15 +1,17 @@
 package tests
 
 import (
-	"bufio"
+	_"bufio"
 	"database/sql"
 	"encoding/json"
 	"flag"
-	"io"
+	_"io"
 	"math/big"
 	"math/rand"
 	"net/url"
 	"os"
+	_"os/exec"
+	"path"
 	"strconv"
 	"testing"
 	"time"
@@ -28,14 +30,14 @@ import (
 )
 
 var (
-	extdb_constr     = flag.String("extdb", "", "Extern DB connection string")
+	extdb_constr     = flag.String("extdb", "postgresql://postgres@localhost:5432?sslmode=disable", "Extern DB connection string")
 	extdb_nocreatedb = flag.Bool("nocreatedb", false, "Specifying nocreatedb will deny to create database")
 	extdb_nodropdb   = flag.Bool("nodropdb", false, "Specifying nodropdb will deny to drop database")
 )
 
 func readBlocks(t *testing.T, db *sql.DB, blockchain *core.BlockChain) {
 	var (
-		testdb, _ = ethdb.NewMemDatabase()
+		testdb    = ethdb.NewMemDatabase()
 		gspec     = &core.Genesis{Config: params.TestChainConfig}
 		genesis   = gspec.MustCommit(testdb)
 		_, _      = core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1, nil)
@@ -47,7 +49,7 @@ func readBlocks(t *testing.T, db *sql.DB, blockchain *core.BlockChain) {
 	)
 
 	engine := ethash.NewFaker()
-	chain, _ := core.NewBlockChain(testdb, nil, params.TestChainConfig, engine, vm.Config{})
+	chain, _ := core.NewBlockChain(testdb, nil, params.TestChainConfig, engine, vm.Config{}, nil)
 
 	rows, err := db.Query(`SELECT h.block_number, h.block_hash, h.fields, b.fields, r.fields
 		FROM headers AS h 
@@ -152,7 +154,7 @@ func handleBlock(t *testing.T, chain *core.BlockChain, engine *ethash.Ethash, bl
 		if prevHeader.Hash() != curHeader.ParentHash {
 			t.Fatalf("parent_hash mismatch: have %x, want %x", prevHeader.Hash(), curHeader.ParentHash)
 		}
-		err := engine.VerifyHeader2(chain, curHeader, prevHeader, false, true)
+		err := engine.VerifyHeader(chain, curHeader, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -201,37 +203,23 @@ func handleReceipts(t *testing.T, blockNumber int64, receipts types.Receipts, he
 	}
 }
 
-func createTestTables(t *testing.T, connectionString string) {
+func createTestTables(t *testing.T, connectionString string, userName string, dbName string) {
 	db, dbErr := sql.Open("postgres", connectionString)
 	if dbErr != nil {
 		t.Fatalf("Filed to open database. %s", dbErr.Error())
 	}
 	defer db.Close()
 
-	file, err := os.Open("../extdb/migrations/001-initial.sql")
+	dir, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("Open sql file failed. %s", err.Error())
+		t.Fatalf("Failed to get working directory. %s", err)
 	}
 
-	reader := bufio.NewReader(file)
-	var query string
-	for {
-		line, err := reader.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		line = line[:len(line)-1]
-		if line == "" {
-			_, err := db.Exec(query)
-			if err != nil {
-				t.Fatalf("Exec sql query failed. %s", err.Error())
-			}
-			query = ""
-		}
-		query += line
-	}
-
-	file.Close()
+	dir = path.Dir(dir + "/../extdb/migrations/")
+	//cmd := exec.Command("goose", "-dir", dir, "postgres", "\"user=" + userName + " dbname=" + dbName + " sslmode=disable\"", "up")
+	//if err := cmd.Run(); err != nil {
+	//	t.Fatalf("Failed to exec goose. %s", err)
+	//}
 }
 
 func createTestDatabase(t *testing.T, connectionString string, noCreateDb bool, noDropDb bool) (string, func()) {
@@ -241,8 +229,9 @@ func createTestDatabase(t *testing.T, connectionString string, noCreateDb bool, 
 		dbName string
 	)
 
+	u, err := url.Parse(connectionString)
+
 	if !noCreateDb {
-		u, err := url.Parse(connectionString)
 		if err != nil {
 			t.Fatalf("Failed to parse connection string. %s", err.Error())
 		}
@@ -263,7 +252,7 @@ func createTestDatabase(t *testing.T, connectionString string, noCreateDb bool, 
 		connectionString = u.Scheme + "://" + u.User.String() + "@" + u.Host + "/" + dbName + "?" + u.RawQuery
 	}
 
-	createTestTables(t, connectionString)
+	createTestTables(t, connectionString, u.User.String(), dbName)
 
 	return connectionString, func() {
 		if !noDropDb {
@@ -286,7 +275,7 @@ func generateBlockchain(t *testing.T) *core.BlockChain {
 			crypto.PubkeyToAddress(key2.PublicKey),
 			crypto.PubkeyToAddress(key3.PublicKey),
 		}
-		testdb, _ = ethdb.NewMemDatabase()
+		testdb = ethdb.NewMemDatabase()
 	)
 
 	// Ensure that key1 has some funds in the genesis block.
@@ -339,7 +328,7 @@ func generateBlockchain(t *testing.T) *core.BlockChain {
 
 	// Import the chain. This runs all block validation rules.
 	engine := ethash.NewFaker()
-	blockchain, _ := core.NewBlockChain(testdb, nil, gspec.Config, engine, vm.Config{})
+	blockchain, _ := core.NewBlockChain(testdb, nil, gspec.Config, engine, vm.Config{}, nil)
 
 	if i, err := blockchain.InsertChain(blocks); err != nil {
 		t.Fatalf("insert error (block %d): %v\n", blocks[i].NumberU64(), err)

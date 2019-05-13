@@ -19,6 +19,7 @@ import (
 type ExtDBpg struct {
 	conn *sql.DB
 	writeDuration mclock.AbsTime
+	isSkipConn bool
 }
 
 var (
@@ -71,6 +72,7 @@ func NewExtDBpg(dbURI string) error {
 	}
 	dbpg := &ExtDBpg{
 		conn: nil,
+		isSkipConn: false,
 	}
 	db = dbpg
 	return dbpg.Connect(dbURI)
@@ -79,6 +81,9 @@ func NewExtDBpg(dbURI string) error {
 func (self *ExtDBpg) Connect(dbURI string) error {
 	conn, err := sql.Open("postgres", dbURI)
 	self.conn = conn
+	if dbURI == "" {
+		self.isSkipConn = true
+	}
 	if err != nil {
 		log.Crit("ExtDB Error when connect to extern DB", "Error", err)
 	} else {
@@ -86,6 +91,10 @@ func (self *ExtDBpg) Connect(dbURI string) error {
 		log.Info("ExtDB Connected to extern DB", "URI", re.ReplaceAllString(dbURI, "$1****$3"))
 	}
 	return err
+}
+
+func (self *ExtDBpg) IsSkipConn() bool {
+	return self.isSkipConn
 }
 
 func (self *ExtDBpg) Close() error {
@@ -238,6 +247,7 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 }
 
 func (self *ExtDBpg) WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
+	time.Sleep(1000 * 10)
 	start := mclock.Now()
 	log.Debug("ExtDB write block reorg", "hash", blockHash, "number", blockNumber)
 
