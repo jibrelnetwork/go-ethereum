@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -641,6 +642,7 @@ type dialer interface {
 
 func (srv *Server) run(dialstate dialer) {
 	srv.log.Info("Started P2P networking", "self", srv.localnode.Node().URLv4())
+	extdb.SetNodeId(srv.localnode.ID())
 	defer srv.loopWG.Done()
 	defer srv.nodedb.Close()
 	defer srv.discmix.Close()

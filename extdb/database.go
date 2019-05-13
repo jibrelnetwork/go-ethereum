@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	_ "github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
 )
@@ -20,6 +21,7 @@ type ExtDBpg struct {
 	conn *sql.DB
 	writeDuration mclock.AbsTime
 	isSkipConn bool
+	nodeId string
 }
 
 var (
@@ -143,7 +145,7 @@ func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *ty
 	start := mclock.Now()
 	log.Debug("ExtDB write pending transaction", "tx_hash", txHash)
 
-	var query = `INSERT INTO pending_transactions (tx_hash, fields, removed, node_id) VALUES ($1, $2, $3, '1') ON CONFLICT DO NOTHING;`
+	var query = `INSERT INTO pending_transactions (tx_hash, fields, removed, node_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;`
 	var fieldsString = "{}"
 	var err error = nil
 	if transaction != nil {
@@ -151,7 +153,7 @@ func (self *ExtDBpg) WritePendingTransaction(txHash common.Hash, transaction *ty
 	}
 	log.Debug("ExtDB pending transaction serialization", "time", common.PrettyDuration(mclock.Now() - start))
 	start = mclock.Now()
-	_, err = self.conn.Exec(query, txHash.Hex(), fieldsString, is_removed)
+	_, err = self.conn.Exec(query, txHash.Hex(), fieldsString, is_removed, self.nodeId)
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB pending transaction insertion", "time", common.PrettyDuration(query_duration))
@@ -254,11 +256,11 @@ func (self *ExtDBpg) WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash,
 	headerString, err := self.SerializeHeaderFields(header)
 	log.Debug("ExtDB header serialization reorg", "time", common.PrettyDuration(mclock.Now() - start))
 	start = mclock.Now()
-	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, node_id, split_id) VALUES ($1, $2, $3, false, '1', $4) ON CONFLICT DO NOTHING;"
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, split_id, node_id) VALUES ($1, $2, $3, false, $4, $5) ON CONFLICT DO NOTHING;"
 	if tx != nil {
-		_, err = tx.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+		_, err = tx.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id, self.nodeId)
 	} else {
-		_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+		_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id, self.nodeId)
 	}
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
@@ -277,11 +279,11 @@ func (self *ExtDBpg) ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Ha
 	headerString, err := self.SerializeHeaderFields(header)
 	log.Debug("ExtDB header serialization reinsert block", "time", common.PrettyDuration(mclock.Now() - start))
 	start = mclock.Now()
-	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, node_id, split_id) VALUES ($1, $2, $3, true, '1', $4) ON CONFLICT DO NOTHING;"
+	var query = "INSERT INTO reorgs (block_hash, block_number, header, reinserted, split_id, node_id) VALUES ($1, $2, $3, true, $4, $5) ON CONFLICT DO NOTHING;"
 	if tx != nil {
-		_, err = tx.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+		_, err = tx.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id, self.nodeId)
 	} else {
-		_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id)
+		_, err = self.conn.Exec(query, blockHash.Hex(), blockNumber, headerString, split_id, self.nodeId)
 	}
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
@@ -308,7 +310,7 @@ func (self *ExtDBpg) WriteChainSplit(tx *sql.Tx, common_block_number uint64, com
 	defer stmt.Close()
 
 	var chain_split_id int
-	err = stmt.QueryRow(common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), "1").Scan(&chain_split_id)
+	err = stmt.QueryRow(common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), self.nodeId).Scan(&chain_split_id)
 
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
@@ -387,4 +389,35 @@ func (self *ExtDBpg) SerializeBlockRewardsFields(blockReward *exttypes.BlockRewa
 func (self *ExtDBpg) SerializeInternalTransactionFields(intTransaction *exttypes.InternalTransaction) (string, error) {
 	b, err := json.Marshal(intTransaction)
 	return string(b), err
+}
+
+func (self *ExtDBpg) WriteChainEvent(
+	block_number uint64,
+	block_hash common.Hash,
+	event_type string, 
+	common_block_number uint64,
+	common_block_hash common.Hash,
+	drop_length int,
+	drop_block_hash common.Hash,
+	add_length int,
+	add_block_hash common.Hash) error {
+
+	start := mclock.Now()
+	log.Debug("ExtDB write chain event", "block hash", block_hash, "block number", block_number, "event type", event_type)
+
+	var query = "INSERT INTO chain_events (block_number, block_hash, type, common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);"
+	_, err := self.conn.Exec(query, block_number, block_hash.Hex(), event_type, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), self.nodeId)
+	query_duration := mclock.Now() - start
+	self.UpdateDbWriteDuration(query_duration)
+	log.Debug("ExtDB chain event insertion", "time", common.PrettyDuration(query_duration))
+	
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *ExtDBpg) SetNodeId(nodeId enode.ID) error {
+	self.nodeId = common.ToHex(nodeId[:])
+	return nil
 }
