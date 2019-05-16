@@ -15,6 +15,14 @@ else
 
     echo "Executing migrations..."
     goose -dir /migrations/ postgres "host=${POSTGRES_DB_HOST} port=${DB_PORT} user=${POSTGRES_DB_USER} password=${POSTGRES_DB_PASS} dbname=${DB_NAME} sslmode=${DB_SSL_MODE}" up
+
+    echo "Updating permissions..."
+    for pg_readonly_user in ${POSTGRES_READONLY_USERS//,/ } ; do
+        echo " ... for user ${pg_readonly_user}"
+        PGPASSWORD="${POSTGRES_DB_PASS}" psql -h "${POSTGRES_DB_HOST}" -p ${DB_PORT} -U "${POSTGRES_DB_USER}" -d "${DB_NAME}" \
+            -c "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO \"${pg_readonly_user}\";" \
+            -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"${pg_readonly_user}\";"
+    done
 fi
 
 echo "Starting geth..."
