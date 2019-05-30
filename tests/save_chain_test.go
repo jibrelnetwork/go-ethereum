@@ -1,16 +1,16 @@
 package tests
 
 import (
-	_"bufio"
+	_ "bufio"
 	"database/sql"
 	"encoding/json"
 	"flag"
-	_"io"
+	_ "io"
 	"math/big"
 	"math/rand"
 	"net/url"
 	"os"
-	_"os/exec"
+	_ "os/exec"
 	"path"
 	"strconv"
 	"testing"
@@ -37,10 +37,10 @@ var (
 
 func readBlocks(t *testing.T, db *sql.DB, blockchain *core.BlockChain) {
 	var (
-		testdb    = ethdb.NewMemDatabase()
-		gspec     = &core.Genesis{Config: params.TestChainConfig}
-		genesis   = gspec.MustCommit(testdb)
-		_, _      = core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1, nil)
+		testdb  = ethdb.NewMemDatabase()
+		gspec   = &core.Genesis{Config: params.TestChainConfig}
+		genesis = gspec.MustCommit(testdb)
+		_, _    = core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1, nil)
 
 		prevHeader                                  *types.Header
 		blockNumber                                 int64
@@ -137,10 +137,7 @@ func fmtJSON(x interface{}) string {
 }
 
 func equal(a, b interface{}) bool {
-	if fmtJSON(a) != fmtJSON(b) { // ignore unexported fields
-		return false
-	}
-	return true
+	return fmtJSON(a) != fmtJSON(b) // ignore unexported fields
 }
 
 func handleBlock(t *testing.T, chain *core.BlockChain, engine *ethash.Ethash, blockNumber int64, blockHash string, curHeader *types.Header, prevHeader *types.Header, curBody *types.Body, block *types.Block) {
