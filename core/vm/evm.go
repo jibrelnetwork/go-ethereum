@@ -82,8 +82,8 @@ type Context struct {
 
 	// Message information
 	ParentTxHash common.Hash
-	Origin   common.Address // Provides information for ORIGIN
-	GasPrice *big.Int       // Provides information for GASPRICE
+	Origin       common.Address // Provides information for ORIGIN
+	GasPrice     *big.Int       // Provides information for GASPRICE
 
 	// Block information
 	Coinbase    common.Address // Provides information for COINBASE
