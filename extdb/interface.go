@@ -33,9 +33,8 @@ type ExtDB interface {
 	WriteChainEvent(
 		block_number uint64,
 		block_hash common.Hash,
+		parent_block_hash common.Hash,
 		event_type string,
-		common_block_number uint64,
-		common_block_hash common.Hash,
 		drop_length int,
 		drop_block_hash common.Hash,
 		add_length int,
@@ -178,15 +177,14 @@ func GetDbWriteDuration() mclock.AbsTime {
 func WriteChainEvent(
 	block_number uint64,
 	block_hash common.Hash,
+	parent_block_hash common.Hash,
 	event_type string,
-	common_block_number uint64,
-	common_block_hash common.Hash,
 	drop_length int,
 	drop_block_hash common.Hash,
 	add_length int,
 	add_block_hash common.Hash) error {
 	if db != nil && !db.IsSkipConn() {
-		if err := db.WriteChainEvent(block_number, block_hash, event_type, common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash); err != nil {
+		if err := db.WriteChainEvent(block_number, block_hash, parent_block_hash, event_type, drop_length, drop_block_hash, add_length, add_block_hash); err != nil {
 			return err
 		}
 	}
