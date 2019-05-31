@@ -394,9 +394,8 @@ func (self *ExtDBpg) SerializeInternalTransactionFields(intTransaction *exttypes
 func (self *ExtDBpg) WriteChainEvent(
 	block_number uint64,
 	block_hash common.Hash,
-	event_type string, 
-	common_block_number uint64,
-	common_block_hash common.Hash,
+	parent_block_hash common.Hash,
+	event_type string,
 	drop_length int,
 	drop_block_hash common.Hash,
 	add_length int,
@@ -405,8 +404,8 @@ func (self *ExtDBpg) WriteChainEvent(
 	start := mclock.Now()
 	log.Debug("ExtDB write chain event", "block hash", block_hash, "block number", block_number, "event type", event_type)
 
-	var query = "INSERT INTO chain_events (block_number, block_hash, type, common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);"
-	_, err := self.conn.Exec(query, block_number, block_hash.Hex(), event_type, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), self.nodeId)
+	var query = "INSERT INTO chain_events (block_number, block_hash, parent_block_hash, type, common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash, node_id) VALUES ($1, $2, $3, $4, 0, '', $5, $6, $7, $8, $9);"
+	_, err := self.conn.Exec(query, block_number, block_hash.Hex(), parent_block_hash.Hex(), event_type, drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), self.nodeId)
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB chain event insertion", "time", common.PrettyDuration(query_duration))
