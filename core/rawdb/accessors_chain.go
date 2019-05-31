@@ -500,14 +500,14 @@ func ReadReceipts(db ethdb.Reader, hash common.Hash, number uint64, config *para
 }
 
 // WriteReceipts stores all the transaction receipts belonging to a block.
-func WriteReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64, receipts types.Receipts) {
+func WriteReceipts(db ethdb.KeyValueWriter, hash common.Hash, parent_hash common.Hash, number uint64, receipts types.Receipts) {
 	// Convert the receipts into their storage form and serialize them
 	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
 	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
 		log.Crit("Failed to store transaction receipts in extern db", "err", err)
 	}
 
-	if err := extdb.WriteChainEvent(number, hash, "created", 0, common.Hash{0}, 0, common.Hash{0}, 0, common.Hash{0}); err != nil {
+	if err := extdb.WriteChainEvent(number, hash, parent_hash, "created", 0, common.Hash{0}, 0, common.Hash{0}); err != nil {
 		log.Crit("Failed to store chain event into extern db", "err", err)
 	}
 	for i, receipt := range receipts {
