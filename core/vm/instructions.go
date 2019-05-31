@@ -24,10 +24,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
-	"golang.org/x/crypto/sha3"
 	"github.com/ethereum/go-ethereum/extdb"
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
+	"github.com/ethereum/go-ethereum/params"
+	"golang.org/x/crypto/sha3"
 )
 
 var (

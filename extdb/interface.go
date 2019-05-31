@@ -33,7 +33,7 @@ type ExtDB interface {
 	WriteChainEvent(
 		block_number uint64,
 		block_hash common.Hash,
-		event_type string, 
+		event_type string,
 		common_block_number uint64,
 		common_block_hash common.Hash,
 		drop_length int,
@@ -152,7 +152,6 @@ func CloseTx(tx *sql.Tx, commit bool) error {
 	return nil
 }
 
-
 func ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	if db != nil && !db.IsSkipConn() {
 		if err := db.ReinsertBlock(tx, split_id, blockHash, blockNumber, header); err != nil {
@@ -179,7 +178,7 @@ func GetDbWriteDuration() mclock.AbsTime {
 func WriteChainEvent(
 	block_number uint64,
 	block_hash common.Hash,
-	event_type string, 
+	event_type string,
 	common_block_number uint64,
 	common_block_hash common.Hash,
 	drop_length int,
