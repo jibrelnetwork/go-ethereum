@@ -15,7 +15,7 @@ RUN apk add --no-cache git make gcc musl-dev linux-headers \
 # Pull Geth into a second stage deploy alpine container
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates postgresql-client
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 COPY --from=goose /go/bin/goose /usr/local/bin/
 COPY extdb/migrations/ /migrations/
