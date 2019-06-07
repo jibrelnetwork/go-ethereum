@@ -655,7 +655,9 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	} else {
 		txs_reward := new(big.Int)
 		for i, receipt := range receipts {
-			txs_reward.Add(txs_reward, new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), txs[i].GasPrice()))
+			if txs != nil {
+				txs_reward.Add(txs_reward, new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), txs[i].GasPrice()))
+			}
 		}
 
 		bReward.BlockNumber = header.Number
