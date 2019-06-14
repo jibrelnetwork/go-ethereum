@@ -892,6 +892,7 @@ func opSuicide(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memo
 		intTransaction.BlockNumber = interpreter.evm.Context.BlockNumber
 		intTransaction.BlockHash = interpreter.evm.Context.BlockHash
 		intTransaction.TimeStamp = interpreter.evm.Time
+		intTransaction.TxOrigin = &interpreter.evm.Context.Origin
 		intTransaction.From = &intTransactionFrom
 		intTransaction.To = &intTransactionTo
 		intTransaction.Value = balance
