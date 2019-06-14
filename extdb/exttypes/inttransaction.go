@@ -14,6 +14,7 @@ type InternalTransaction struct {
 	Operation    string
 	CallDepth    int
 	TimeStamp    *big.Int
+	TxOrigin     *common.Address
 	From         *common.Address
 	To           *common.Address
 	Value        *big.Int
