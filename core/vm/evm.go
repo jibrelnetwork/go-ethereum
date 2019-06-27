@@ -235,8 +235,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}()
 	}
 	if evm.depth > 0 {
+		evm.index++
 		defer func() {
-			evm.index++
 			intTransactionFrom := caller.Address()
 			intTransactionTo := addr
 			intTransaction := new(exttypes.InternalTransaction)
@@ -340,8 +340,8 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	if evm.depth > 0 {
+		evm.index++
 		defer func() {
-			evm.index++
 			intTransactionFrom := caller.Address()
 			intTransactionTo := addr
 			intTransaction := new(exttypes.InternalTransaction)
@@ -475,8 +475,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	ret, err := run(evm, contract, nil, false)
 
 	if evm.depth > 0 {
+		evm.index++
 		defer func() {
-			evm.index++
 			intTransactionFrom := caller.Address()
 			intTransactionTo := address
 			intTransaction := new(exttypes.InternalTransaction)
