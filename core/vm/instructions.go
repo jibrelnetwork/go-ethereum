@@ -888,8 +888,8 @@ func opSuicide(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memo
 
 	interpreter.evm.StateDB.Suicide(contract.Address())
 
+	interpreter.evm.index++
 	defer func() {
-		interpreter.evm.index++
 		intTransactionTo := addressTo
 		intTransactionFrom := contract.Address()
 		intTransaction := new(exttypes.InternalTransaction)
