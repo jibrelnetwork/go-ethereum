@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/extdb"
+	"github.com/ethereum/go-ethereum/extdb/utils"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -1171,6 +1172,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 			// Write all the data out into the database
 			rawdb.WriteBody(batch, block.Hash(), block.NumberU64(), block.Body())
 			rawdb.WriteReceipts(batch, block.Hash(), block.ParentHash(), block.NumberU64(), receiptChain[i])
+			utils.WriteTokenBalances(extdb.GetDB(), bc, block, receiptChain[i])
 			rawdb.WriteTxLookupEntries(batch, block)
 
 			stats.processed++
@@ -1356,6 +1358,8 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// Write other block data using a batch.
 	batch := bc.db.NewBatch()
 	rawdb.WriteReceipts(batch, block.Hash(), block.ParentHash(), block.NumberU64(), receipts)
+
+	utils.WriteTokenBalances(extdb.GetDB(), bc, block, receipts)
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
@@ -2014,7 +2018,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 
 		extdb.ReinsertBlock(tx, chain_split_id, newChain[i].Hash(), newChain[i].NumberU64(), newChain[i].Header())
 		extdb.WriteChainEvent(newChain[i].NumberU64(), newChain[i].Hash(), newChain[i].ParentHash(), "reinserted", 0, common.Hash{0}, 0, common.Hash{0})
-		
+
 		// Write lookup entries for hash based transaction/receipt searches
 		rawdb.WriteTxLookupEntries(bc.db, newChain[i])
 		addedTxs = append(addedTxs, newChain[i].Transactions()...)

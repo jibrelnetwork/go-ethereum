@@ -22,6 +22,7 @@ type ExtDB interface {
 	WriteStateObject(blockHash common.Hash, blockNumber uint64, addr common.Address, obj interface{}) error
 	WriteRewards(blockHash common.Hash, blockNumber uint64, addr common.Address, blockReward *exttypes.BlockReward) error
 	WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error
+	WriteTokenBalance(tokenBalance *exttypes.TokenBalance) error
 	WriteReorg(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error
 	WriteChainSplit(tx *sql.Tx, common_block_number uint64, common_block_hash common.Hash, drop_length int, drop_block_hash common.Hash, add_length int, add_block_hash common.Hash) (int, error)
 	ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error
@@ -56,6 +57,10 @@ func Close() error {
 		return db.Close()
 	}
 	return nil
+}
+
+func GetDB() ExtDB {
+	return db
 }
 
 func WriteBlockHeader(blockHash common.Hash, blockNumber uint64, header *types.Header) error {
@@ -112,6 +117,15 @@ func WriteRewards(blockHash common.Hash, blockNumber uint64, address common.Addr
 	return nil
 }
 
+func WriteTokenBalance(tokenBalance *exttypes.TokenBalance) error {
+	if db != nil && !db.IsSkipConn() {
+		if err := db.WriteTokenBalance(tokenBalance); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func WriteInternalTransaction(intTransaction *exttypes.InternalTransaction) error {
 	if db != nil && !db.IsSkipConn() {
 		if err := db.WriteInternalTransaction(intTransaction); err != nil {
@@ -150,7 +164,6 @@ func CloseTx(tx *sql.Tx, commit bool) error {
 	}
 	return nil
 }
-
 
 func ReinsertBlock(tx *sql.Tx, split_id int, blockHash common.Hash, blockNumber uint64, header *types.Header) error {
 	if db != nil && !db.IsSkipConn() {
