@@ -1277,7 +1277,7 @@ func (t *txLookup) Add(tx *types.Transaction) {
 
 	t.all[tx.Hash()] = tx
 
-	extdb.WritePendingTransaction(tx.Hash(), tx, false);
+	extdb.WritePendingTransaction(tx.Hash(), tx, false)
 }
 
 // Remove removes a transaction from the lookup.
@@ -1287,5 +1287,5 @@ func (t *txLookup) Remove(hash common.Hash) {
 
 	delete(t.all, hash)
 
-	extdb.WritePendingTransaction(hash, nil, true);
+	extdb.WritePendingTransaction(hash, nil, true)
 }
