@@ -7,6 +7,8 @@ if [ ! -f "build/env.sh" ]; then
     exit 2
 fi
 
+build/configure.sh
+
 # Create fake Go workspace if it doesn't exist yet.
 workspace="$PWD/build/_workspace"
 root="$PWD"
