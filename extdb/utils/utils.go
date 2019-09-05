@@ -124,12 +124,12 @@ func get_ERC20_token_balance_from_EVM(bc BlockChain, statedb *state.StateDB, blo
 
 	ret, gas, failed, err := token.ApplyMessage(evm, msg, gp)
 	if failed {
-		log.Info(fmt.Sprintf("get_ERC20_token_balance: vm err for symbol: %v, failed=%v", err, failed))
+		log.Debug(fmt.Sprintf("get_ERC20_token_balance: vm err for symbol: %v, failed=%v", err, failed))
 		return nil, fmt.Errorf("vm err")
 	}
 
 	if err != nil {
-		log.Info(fmt.Sprintf("get_ERC20_token_balance: getting 'balanceOf' caused error in vm: %v", err))
+		log.Debug(fmt.Sprintf("get_ERC20_token_balance: getting 'balanceOf' caused error in vm: %v", err))
 		return nil, err
 	}
 
