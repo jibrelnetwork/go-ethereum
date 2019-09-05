@@ -46,7 +46,7 @@ const (
 	lowPort               = 1024
 )
 
-const testTopic = "foo"
+//const testTopic = "foo"
 
 const (
 	printTestImgLogs = false
