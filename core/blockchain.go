@@ -862,9 +862,8 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		}
 		// Write all the data out into the database
 		rawdb.WriteBody(batch, block.Hash(), block.NumberU64(), block.Body())
-		rawdb.WriteReceipts(batch, block.Hash(), block.ParentHash(), block.NumberU64(), receipts)
-
 		utils.WriteTokenBalances(extdb.GetDB(), bc, block, receipts)
+		rawdb.WriteReceipts(batch, block.Hash(), block.ParentHash(), block.NumberU64(), receipts)
 
 		rawdb.WriteTxLookupEntries(batch, block)
 
@@ -1016,9 +1015,8 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	// Write other block data using a batch.
 	batch := bc.db.NewBatch()
-	rawdb.WriteReceipts(batch, block.Hash(), block.ParentHash(), block.NumberU64(), receipts)
-
 	utils.WriteTokenBalances(extdb.GetDB(), bc, block, receipts)
+	rawdb.WriteReceipts(batch, block.Hash(), block.ParentHash(), block.NumberU64(), receipts)
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
