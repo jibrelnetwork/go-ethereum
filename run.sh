@@ -14,7 +14,7 @@ else
     extdb_option="-extdb=postgres://${POSTGRES_DB_USER}:${POSTGRES_DB_PASS}@${POSTGRES_DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}"
 
     echo "Executing migrations..."
-    goose -dir /migrations/ postgres "host=${POSTGRES_DB_HOST} port=${DB_PORT} user=${POSTGRES_DB_USER} password=${POSTGRES_DB_PASS} dbname=${DB_NAME} sslmode=${DB_SSL_MODE}" up
+    goose -dir /schema_migrations/ postgres "host=${POSTGRES_DB_HOST} port=${DB_PORT} user=${POSTGRES_DB_USER} password=${POSTGRES_DB_PASS} dbname=${DB_NAME} sslmode=${DB_SSL_MODE}" up
 
     echo "Updating permissions..."
     for pg_readonly_user in ${POSTGRES_READONLY_USERS//,/ } ; do
