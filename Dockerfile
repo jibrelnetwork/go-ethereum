@@ -18,7 +18,8 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates postgresql-client
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 COPY --from=goose /go/bin/goose /usr/local/bin/
-COPY extdb/migrations/ /migrations/
+COPY extdb/schema_migrations/ /schema_migrations/
+COPY extdb/data_migrations/ /data_migrations/
 COPY run.sh /usr/local/bin/
 
 EXPOSE 8545 8546 30303 30303/udp
