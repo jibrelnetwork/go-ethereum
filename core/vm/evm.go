@@ -269,7 +269,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			} else {
 				intTransaction.Status = "success"
 			}
-			extdb.WriteInternalTransaction(intTransaction)
+			if value.Cmp(big.NewInt(0)) != 0 {
+				extdb.WriteInternalTransaction(intTransaction)
+			}
 		}()
 	}
 	ret, err = run(evm, contract, input, false)
@@ -316,6 +318,35 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	contract := NewContract(caller, to, value, gas)
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
+	if evm.depth > 0 {
+		evm.index++
+		defer func() {
+			intTransactionFrom := caller.Address()
+			intTransactionTo := addr
+			intTransaction := new(exttypes.InternalTransaction)
+			intTransaction.BlockNumber = evm.Context.BlockNumber
+			intTransaction.BlockHash = evm.Context.BlockHash
+			intTransaction.TimeStamp = evm.Time
+			intTransaction.TxOrigin = &evm.Context.Origin
+			intTransaction.From = &intTransactionFrom
+			intTransaction.To = &intTransactionTo
+			intTransaction.Value = value
+			intTransaction.GasLimit = gas
+			intTransaction.CallDepth = evm.depth
+			intTransaction.Operation = "callcode"
+			intTransaction.ParentTxHash = evm.Context.ParentTxHash
+			intTransaction.Payload = input
+			intTransaction.Index = evm.index
+			if err != nil {
+				intTransaction.Status = err.Error()
+			} else {
+				intTransaction.Status = "success"
+			}
+			if value.Cmp(big.NewInt(0)) != 0 {
+				extdb.WriteInternalTransaction(intTransaction)
+			}
+		}()
+	}
 	ret, err = run(evm, contract, input, false)
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
@@ -349,33 +380,6 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	contract := NewContract(caller, to, nil, gas).AsDelegate()
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
-	if evm.depth > 0 {
-		evm.index++
-		defer func() {
-			intTransactionFrom := caller.Address()
-			intTransactionTo := addr
-			intTransaction := new(exttypes.InternalTransaction)
-			intTransaction.BlockNumber = evm.Context.BlockNumber
-			intTransaction.BlockHash = evm.Context.BlockHash
-			intTransaction.TimeStamp = evm.Time
-			intTransaction.TxOrigin = &evm.Context.Origin
-			intTransaction.From = &intTransactionFrom
-			intTransaction.To = &intTransactionTo
-			intTransaction.Value = nil
-			intTransaction.GasLimit = gas
-			intTransaction.CallDepth = evm.depth
-			intTransaction.Operation = "delegatecall"
-			intTransaction.ParentTxHash = evm.Context.ParentTxHash
-			intTransaction.Payload = input
-			intTransaction.Index = evm.index
-			if err != nil {
-				intTransaction.Status = err.Error()
-			} else {
-				intTransaction.Status = "success"
-			}
-			extdb.WriteInternalTransaction(intTransaction)
-		}()
-	}
 	ret, err = run(evm, contract, input, false)
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)

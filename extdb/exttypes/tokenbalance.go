@@ -13,4 +13,5 @@ type TokenBalance struct {
 	HolderBalance *big.Int
 	BlockNumber   *big.Int
 	BlockHash     common.Hash
+	TokenDecimals *uint8
 }
