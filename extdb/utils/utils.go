@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"math/big"
-	"os"
-	"runtime"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -20,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/extdb/exttypes"
+	"github.com/ethereum/go-ethereum/extdb/extdb_common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -69,26 +67,6 @@ func init() {
 	log.Info("extdb::utils::init()")
 }
 
-// Fatalf formats a message to standard error and exits the program.
-// The message is also printed to standard output if standard error
-// is redirected to a different file.
-func fatalf(format string, args ...interface{}) {
-	w := io.MultiWriter(os.Stdout, os.Stderr)
-	if runtime.GOOS == "windows" {
-		// The SameFile check below doesn't work on Windows.
-		// stdout is unlikely to get redirected though, so just print there.
-		w = os.Stdout
-	} else {
-		outf, _ := os.Stdout.Stat()
-		errf, _ := os.Stderr.Stat()
-		if outf != nil && errf != nil && os.SameFile(outf, errf) {
-			w = os.Stderr
-		}
-	}
-	fmt.Fprintf(w, "Fatal: "+format+"\n", args...)
-	os.Exit(1)
-}
-
 func get_ERC20_token_balance_from_EVM(bc BlockChain, statedb *state.StateDB, block *types.Block, contract_address, querying_addr *common.Address) (*big.Int, error) {
 	var (
 		err             error
@@ -115,7 +93,7 @@ func get_ERC20_token_balance_from_EVM(bc BlockChain, statedb *state.StateDB, blo
 	// Encode input for retrieving token balance
 	input, err = erc20_token_abi.Pack("balanceOf", querying_addr)
 	if err != nil {
-		fatalf("Can't pack balanceOf input: %v", err)
+		extdb_common.Fatalf("Can't pack balanceOf input: %v", err)
 	}
 
 	// Getting token holder balance
@@ -143,7 +121,7 @@ func get_ERC20_token_balance_from_EVM(bc BlockChain, statedb *state.StateDB, blo
 	if !((err != nil) || (failed)) {
 		err = erc20_token_abi.Unpack(&balance, "balanceOf", ret)
 		if err != nil {
-			fatalf("Can't upack balanceOf output from the EVM: %v", err)
+			extdb_common.Fatalf("Can't upack balanceOf output from the EVM: %v", err)
 		}
 	}
 
@@ -178,7 +156,7 @@ func get_ERC20_token_decimals_from_EVM(bc BlockChain, statedb *state.StateDB, bl
 	// Encode input for retrieving token balance
 	input, err = erc20_token_abi.Pack("decimals")
 	if err != nil {
-		fatalf("Can't pack input for decimals: %v", err)
+		extdb_common.Fatalf("Can't pack input for decimals: %v", err)
 	}
 
 	// Getting token decimals
@@ -206,7 +184,7 @@ func get_ERC20_token_decimals_from_EVM(bc BlockChain, statedb *state.StateDB, bl
 	if !((err != nil) || (failed)) {
 		err = erc20_token_abi.Unpack(&decimals, "decimals", ret)
 		if err != nil {
-			fatalf("Can't upack decimals output from the EVM: %v", err)
+			extdb_common.Fatalf("Can't upack decimals output from the EVM: %v", err)
 		}
 	}
 
