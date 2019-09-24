@@ -53,7 +53,7 @@ postgres=# \q
 ## Init database
 
 ```sh
-goose -dir  ~/go-ethereum/extdb/migrations/ postgres "user=DB_USER_NAME dbname=DB_NAME sslmode=disable" up
+goose -dir  ~/go-ethereum/extdb/schema_migrations/ postgres "user=DB_USER_NAME dbname=DB_NAME sslmode=disable" up
 ```
 
 ## Clone project and create workdir
