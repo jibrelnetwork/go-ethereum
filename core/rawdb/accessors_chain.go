@@ -168,7 +168,7 @@ func WriteHeader(db DatabaseWriter, header *types.Header) {
 	key := headerNumberKey(hash)
 
 	if err := extdb.WriteBlockHeader(hash, number, header); err != nil {
-		log.Crit("Failed to store header in extern db", "err", err)
+		log.Warn("Failed to store header in extern db", "err", err)
 	}
 
 	if err := db.Put(key, encoded); err != nil {
@@ -237,7 +237,7 @@ func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body *types.B
 		log.Crit("Failed to RLP encode body", "err", err)
 	}
 	if err := extdb.WriteBlockBody(hash, number, body); err != nil {
-		log.Crit("Failed to store body in extern db", "err", err)
+		log.Warn("Failed to store body in extern db", "err", err)
 	}
 	WriteBodyRLP(db, hash, number, data)
 }
@@ -315,11 +315,11 @@ func WriteReceipts(db DatabaseWriter, hash common.Hash, parent_hash common.Hash,
 	// Convert the receipts into their storage form and serialize them
 	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
 	if err := extdb.WriteReceipts(hash, number, &exttypes.ReceiptsContainer{receipts}); err != nil {
-		log.Crit("Failed to store transaction receipts in extern db", "err", err)
+		log.Warn("Failed to store transaction receipts in extern db", "err", err)
 	}
 
 	if err := extdb.WriteChainEvent(number, hash, parent_hash, "created", 0, common.Hash{0}, 0, common.Hash{0}); err != nil {
-		log.Crit("Failed to store chain event into extern db", "err", err)
+		log.Warn("Failed to store chain event into extern db", "err", err)
 	}
 	for i, receipt := range receipts {
 		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
