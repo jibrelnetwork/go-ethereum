@@ -3,6 +3,7 @@ package extdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"encoding/json"
 	"os"
 	"regexp"
@@ -317,15 +318,21 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 		"block_number", intTransaction.BlockNumber.Uint64(),
 		"op", intTransaction.Operation)
 
-	var query = `INSERT INTO internal_transactions (block_number, block_hash, parent_tx_hash, index, type, timestamp, fields)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING;`
+	var query = `INSERT INTO internal_transactions (block_number, block_hash, parent_tx_hash, index, type, timestamp, fields, call_depth)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING;`
 
 	fieldsString, err := self.SerializeInternalTransactionFields(intTransaction)
+	if err != nil {
+		log.Warn("ExtDB Error serialize internal transaction", "Error", err)
+		sentry_exception(err)
+		time.Sleep(10 * time.Second)
+	}
+
 	log.Debug("ExtDB internal transaction serialization", "time", common.PrettyDuration(mclock.Now()-start))
 	start = mclock.Now()
 	_, err = self.exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.BlockHash.Hex(),
 		intTransaction.ParentTxHash.Hex(), intTransaction.Index, intTransaction.Operation,
-		intTransaction.TimeStamp.Uint64(), fieldsString)
+		intTransaction.TimeStamp.Uint64(), fieldsString, intTransaction.CallDepth)
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB internal transaction insertion", "time", common.PrettyDuration(query_duration))
@@ -414,6 +421,8 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB chain split insertion", "time", common.PrettyDuration(query_duration))
+
+	sentry_exception(errors.New("ExtDB chain split"))
 
 	if err != nil {
 		log.Warn("ExtDB Error writing chain split to extern DB", "Error", err)
