@@ -137,8 +137,6 @@ func (self *ExtDBpg) queryRow(query string, args ...interface{}) (int, error) {
 		err error = nil
 	)
 
-	err = self.conn.QueryRow(query, args...).Scan(&chain_split_id)
-
 	for {
 		err = self.conn.QueryRow(query, args...).Scan(&chain_split_id)
 		if err != nil {
@@ -317,15 +315,21 @@ func (self *ExtDBpg) WriteInternalTransaction(intTransaction *exttypes.InternalT
 		"block_number", intTransaction.BlockNumber.Uint64(),
 		"op", intTransaction.Operation)
 
-	var query = `INSERT INTO internal_transactions (block_number, block_hash, parent_tx_hash, index, type, timestamp, fields)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING;`
+	var query = `INSERT INTO internal_transactions (block_number, block_hash, parent_tx_hash, index, type, timestamp, fields, call_depth)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING;`
 
 	fieldsString, err := self.SerializeInternalTransactionFields(intTransaction)
+	if err != nil {
+		log.Warn("ExtDB Error serialize internal transaction", "Error", err)
+		sentry_exception(err)
+		time.Sleep(10 * time.Second)
+	}
+
 	log.Debug("ExtDB internal transaction serialization", "time", common.PrettyDuration(mclock.Now()-start))
 	start = mclock.Now()
 	_, err = self.exec(query, intTransaction.BlockNumber.Uint64(), intTransaction.BlockHash.Hex(),
 		intTransaction.ParentTxHash.Hex(), intTransaction.Index, intTransaction.Operation,
-		intTransaction.TimeStamp.Uint64(), fieldsString)
+		intTransaction.TimeStamp.Uint64(), fieldsString, intTransaction.CallDepth)
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB internal transaction insertion", "time", common.PrettyDuration(query_duration))
@@ -410,7 +414,6 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 
 	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id"
 	chain_split_id, err := self.queryRow(query, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), self.nodeId)
-
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB chain split insertion", "time", common.PrettyDuration(query_duration))
