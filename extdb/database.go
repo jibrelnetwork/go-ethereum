@@ -138,8 +138,6 @@ func (self *ExtDBpg) queryRow(query string, args ...interface{}) (int, error) {
 		err error = nil
 	)
 
-	err = self.conn.QueryRow(query, args...).Scan(&chain_split_id)
-
 	for {
 		err = self.conn.QueryRow(query, args...).Scan(&chain_split_id)
 		if err != nil {
@@ -417,7 +415,6 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 
 	var query = "INSERT INTO chain_splits (common_block_number, common_block_hash, drop_length, drop_block_hash, add_length, add_block_hash, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id"
 	chain_split_id, err := self.queryRow(query, common_block_number, common_block_hash.Hex(), drop_length, drop_block_hash.Hex(), add_length, add_block_hash.Hex(), self.nodeId)
-
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB chain split insertion", "time", common.PrettyDuration(query_duration))
