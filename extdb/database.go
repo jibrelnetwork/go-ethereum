@@ -419,8 +419,6 @@ func (self *ExtDBpg) WriteChainSplit(common_block_number uint64, common_block_ha
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB chain split insertion", "time", common.PrettyDuration(query_duration))
 
-	sentry_exception(errors.New("ExtDB chain split"))
-
 	if err != nil {
 		log.Warn("ExtDB Error writing chain split to extern DB", "Error", err)
 		sentry_exception(err)
