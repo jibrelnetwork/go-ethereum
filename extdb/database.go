@@ -3,7 +3,6 @@ package extdb
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"encoding/json"
 	"os"
 	"regexp"
