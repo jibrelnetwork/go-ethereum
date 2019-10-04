@@ -121,7 +121,8 @@ func get_ERC20_token_balance_from_EVM(bc BlockChain, statedb *state.StateDB, blo
 	if !((err != nil) || (failed)) {
 		err = erc20_token_abi.Unpack(&balance, "balanceOf", ret)
 		if err != nil {
-			extdb_common.Fatalf("Can't upack balanceOf output from the EVM: %v", err)
+			log.Warn("Can't upack balanceOf output from the EVM:", err)
+			balance.SetUint64(0)
 		}
 	}
 
@@ -184,7 +185,8 @@ func get_ERC20_token_decimals_from_EVM(bc BlockChain, statedb *state.StateDB, bl
 	if !((err != nil) || (failed)) {
 		err = erc20_token_abi.Unpack(&decimals, "decimals", ret)
 		if err != nil {
-			extdb_common.Fatalf("Can't upack decimals output from the EVM: %v", err)
+			log.Warn("Can't upack decimals output from the EVM:", err)
+			*decimals = uint8(18)
 		}
 	}
 
