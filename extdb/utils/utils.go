@@ -40,6 +40,7 @@ type ExtDB interface {
 
 var (
 	erc20_token_abi_str            string
+	erc721_token_abi_str           string
 	erc20_approval_event_signature []byte
 	erc20_transfer_event_signature []byte
 	mint_event_signature           []byte
@@ -51,6 +52,8 @@ var (
 func init() {
 	// ERC-20 ABI
 	erc20_token_abi_str = `[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"value","type":"uint256"}],"name":"approve","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"from","type":"address"},{"name":"to","type":"address"},{"name":"value","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"to","type":"address"},{"name":"value","type":"uint256"}],"name":"transfer","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"},{"name":"","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"}]`
+	// ERC-721 ABI
+	erc721_token_abi_str = `[{"constant": true,"inputs": [{"name": "_tokenId","type": "uint256"}],"name": "ownerOf","outputs": [{"name": "","type": "address"}],"payable": false,"stateMutability": "view","type": "function"}]`
 	// Transfer(address,address,uint256)
 	erc20_transfer_event_signature, _ = hex.DecodeString("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 	// Approval(address,address,uint256)
@@ -195,6 +198,70 @@ func get_ERC20_token_decimals_from_EVM(bc BlockChain, statedb *state.StateDB, bl
 	return decimals, nil
 }
 
+func is_ERC721_token(bc BlockChain, statedb *state.StateDB, block *types.Block, contract_address, owner_address *common.Address, tokenId *big.Int) (bool, error) {
+	var (
+		err              error
+		input            []byte
+		erc721_token_abi abi.ABI
+	)
+
+	vm_config := vm.Config{
+		Debug: false,
+	}
+
+	erc721_token_abi, err = abi.JSON(strings.NewReader(erc721_token_abi_str))
+	bc_config := bc.Config()
+	value := big.NewInt(0)
+	gas_limit := uint64(50000000)
+	gas_price := big.NewInt(1)
+	fake_src_addr := common.HexToAddress("8999999999999999999999999999999999999998")
+	fake_balance := big.NewInt(0)
+	fake_balance.SetString("9999999999999999999999999999", 10)
+
+	// Add a fake account with huge balance so we have money to pay for gas to execute instructions on the EVM
+	statedb.AddBalance(fake_src_addr, fake_balance)
+
+	// Encode input for retrieving token balance
+	input, err = erc721_token_abi.Pack("ownerOf", tokenId)
+	if err != nil {
+		extdb_common.Fatalf("Can't pack balanceOf input: %v", err)
+	}
+
+	// Getting token holder balance
+	msg := types.NewMessage(fake_src_addr, contract_address, 0, value, gas_limit, gas_price, input, false)
+	evm_context := token.NewEVMContext(msg, block.Header(), bc, nil)
+	evm := vm.NewEVM(evm_context, statedb, bc_config, vm_config)
+	gp := new(token.GasPool).AddGas(math.MaxUint64)
+
+	ret, gas, failed, err := token.ApplyMessage(evm, msg, gp)
+	if failed {
+		log.Debug(fmt.Sprintf("is_ERC721_token_type: vm err for symbol: %v, failed=%v", err, failed))
+		return false, fmt.Errorf("vm err")
+	}
+
+	if err != nil {
+		log.Debug(fmt.Sprintf("is_ERC721_token_type: getting 'ownerOf' caused error in vm: %v", err))
+		return false, err
+	}
+
+	if len(ret) == 0 {
+		return false, fmt.Errorf("len(ret)==0")
+	}
+	real_owner_address := &common.Address{}
+
+	if !((err != nil) || (failed)) {
+		err = erc721_token_abi.Unpack(&real_owner_address, "ownerOf", ret)
+		if err != nil {
+			log.Warn("Can't upack ownerOf output from the EVM:", err)
+			return false, err
+		}
+	}
+
+	_ = gas
+
+	return true, nil
+}
+
 func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts types.Receipts) error {
 	blockchain_config := bc.Config()
 	statedb, err := bc.StateAt(block.Root())
@@ -217,7 +284,10 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 			tokenBalanceContract.BlockHash = block.Hash()
 			tokenBalanceContract.TokenDecimals, err = get_ERC20_token_decimals_from_EVM(bc, statedb, block, &tokenBalanceContract.TokenAddress)
 			tokenBalanceContract.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceContract.TokenAddress, &tokenBalanceContract.HolderAddress)
-			if err == nil {
+			erc721_tokenId := big.NewInt(0)
+			is_erc721, _ := is_ERC721_token(bc, statedb, block, &tokenBalanceContract.TokenAddress, &tokenBalanceContract.HolderAddress, erc721_tokenId)
+			if ( !is_erc721 && err == nil ) {
+				tokenBalanceContract.TokenType = "erc20"
 				extdb.WriteTokenBalance(tokenBalanceContract)
 			}
 			for _, transaction := range block.Transactions() {
@@ -232,7 +302,9 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 					tokenBalanceOwner.BlockHash = block.Hash()
 					tokenBalanceOwner.TokenDecimals = tokenBalanceContract.TokenDecimals
 					tokenBalanceOwner.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceOwner.TokenAddress, &tokenBalanceOwner.HolderAddress)
-					if err == nil {
+					is_erc721, _ := is_ERC721_token(bc, statedb, block, &tokenBalanceOwner.TokenAddress, &tokenBalanceOwner.HolderAddress, erc721_tokenId)
+					if ( !is_erc721 && err == nil ) {
+						tokenBalanceOwner.TokenType = "erc20"
 						extdb.WriteTokenBalance(tokenBalanceOwner)
 					}
 				}
@@ -250,7 +322,13 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 				tokenBalanceFrom.BlockHash = event.BlockHash
 				tokenBalanceFrom.TokenDecimals, err = get_ERC20_token_decimals_from_EVM(bc, statedb, block, &tokenBalanceFrom.TokenAddress)
 				tokenBalanceFrom.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceFrom.TokenAddress, &tokenBalanceFrom.HolderAddress)
-				if err == nil {
+				erc721_tokenId := big.NewInt(0).SetBytes(event.Data)
+				is_erc721, err_721 := is_ERC721_token(bc, statedb, block, &tokenBalanceFrom.TokenAddress, &tokenBalanceFrom.HolderAddress, erc721_tokenId)
+				if ( !is_erc721 && err == nil ) {
+					tokenBalanceFrom.TokenType = "erc20"
+					extdb.WriteTokenBalance(tokenBalanceFrom)
+				} else if ( is_erc721 && err_721 == nil ) {
+					tokenBalanceFrom.TokenType = "erc721"
 					extdb.WriteTokenBalance(tokenBalanceFrom)
 				}
 
@@ -261,7 +339,11 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 				tokenBalanceTo.BlockHash = event.BlockHash
 				tokenBalanceTo.TokenDecimals = tokenBalanceFrom.TokenDecimals
 				tokenBalanceTo.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress, &tokenBalanceTo.HolderAddress)
-				if err == nil {
+				if ( !is_erc721 && err == nil ) {
+					tokenBalanceTo.TokenType = "erc20"
+					extdb.WriteTokenBalance(tokenBalanceTo)
+				} else if ( is_erc721 && err_721 == nil ) {
+					tokenBalanceTo.TokenType = "erc721"
 					extdb.WriteTokenBalance(tokenBalanceTo)
 				}
 			}
@@ -277,6 +359,7 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 				tokenBalanceTo.TokenDecimals, err = get_ERC20_token_decimals_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress)
 				tokenBalanceTo.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress, &tokenBalanceTo.HolderAddress)
 				if err == nil {
+					tokenBalanceTo.TokenType = "erc20"
 					extdb.WriteTokenBalance(tokenBalanceTo)
 				}
 			}

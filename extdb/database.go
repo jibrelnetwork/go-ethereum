@@ -348,15 +348,16 @@ func (self *ExtDBpg) WriteTokenBalance(tokenBalance *exttypes.TokenBalance) erro
 		"token_address", tokenBalance.TokenAddress.Hex(),
 		"holder_address", tokenBalance.HolderAddress.Hex(),
 		"balance", tokenBalance.HolderBalance.String(),
-		"token_decimals", tokenBalance.TokenDecimals)
+		"token_decimals", tokenBalance.TokenDecimals,
+		"token_type", tokenBalance.TokenType)
 
-	var query = `INSERT INTO token_holders (block_number, block_hash, token_address, holder_address, balance, decimals)
-                 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;`
+	var query = `INSERT INTO token_holders (block_number, block_hash, token_address, holder_address, balance, decimals, token_type)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING;`
 
 	start = mclock.Now()
 	_, err := self.exec(query, tokenBalance.BlockNumber.Uint64(), tokenBalance.BlockHash.Hex(),
 		tokenBalance.TokenAddress.Hex(), tokenBalance.HolderAddress.Hex(), tokenBalance.HolderBalance.String(),
-		tokenBalance.TokenDecimals)
+		tokenBalance.TokenDecimals, tokenBalance.TokenType)
 	query_duration := mclock.Now() - start
 	self.UpdateDbWriteDuration(query_duration)
 	log.Debug("ExtDB write token balance", "time", common.PrettyDuration(query_duration))

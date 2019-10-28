@@ -14,4 +14,5 @@ type TokenBalance struct {
 	BlockNumber   *big.Int
 	BlockHash     common.Hash
 	TokenDecimals *uint8
+	TokenType     string
 }
