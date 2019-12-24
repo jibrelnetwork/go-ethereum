@@ -589,6 +589,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 			log.Trace("Discarding freshly underpriced transaction", "hash", tx.Hash(), "price", tx.GasPrice())
 			underpricedTxMeter.Mark(1)
 			pool.removeTx(tx.Hash(), false)
+			extdb.WritePendingTransaction(tx.Hash(), nil, true, "underpriced");
 		}
 	}
 	// Try to replace an existing transaction in the pending pool
@@ -605,6 +606,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 			pool.all.Remove(old.Hash())
 			pool.priced.Removed(1)
 			pendingReplaceMeter.Mark(1)
+			extdb.WritePendingTransaction(tx.Hash(), nil, true, "replaced");
 		}
 		pool.all.Add(tx)
 		pool.priced.Put(tx)
@@ -655,6 +657,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction) (bool, er
 		pool.all.Remove(old.Hash())
 		pool.priced.Removed(1)
 		queuedReplaceMeter.Mark(1)
+		extdb.WritePendingTransaction(old.Hash(), nil, true, "discarded_old_tx");
 	} else {
 		// Nothing was replaced, bump the queued counter
 		queuedGauge.Inc(1)
@@ -696,6 +699,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		pool.priced.Removed(1)
 
 		pendingDiscardMeter.Mark(1)
+		extdb.WritePendingTransaction(hash, nil, true, "discarded_new_tx");
 		return false
 	}
 	// Otherwise discard any previous transaction and mark this
@@ -704,6 +708,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		pool.priced.Removed(1)
 
 		pendingReplaceMeter.Mark(1)
+		extdb.WritePendingTransaction(old.Hash(), nil, true, "discarded_old_tx");
 	} else {
 		// Nothing was replaced, bump the pending counter
 		pendingGauge.Inc(1)
@@ -1063,6 +1068,9 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			txs = append(txs, set.Flatten()...)
 		}
 		pool.txFeed.Send(NewTxsEvent{txs})
+		for _, tx := range txs {
+			extdb.WritePendingTransaction(tx.Hash(), tx, false, "new");
+		}
 	}
 }
 
@@ -1173,6 +1181,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			log.Trace("Removed old queued transaction", "hash", hash)
+			extdb.WritePendingTransaction(hash, nil, true, "low_nonce_promote");
 		}
 		// Drop all transactions that are too costly (low balance or out of gas)
 		drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
@@ -1180,6 +1189,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			log.Trace("Removed unpayable queued transaction", "hash", hash)
+			extdb.WritePendingTransaction(hash, nil, true, "low_balance_or_out_of_gas");
 		}
 		queuedNofundsMeter.Mark(int64(len(drops)))
 
@@ -1202,6 +1212,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 				hash := tx.Hash()
 				pool.all.Remove(hash)
 				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
+				extdb.WritePendingTransaction(hash, nil, true, "over_allowed_limit");
 			}
 			queuedRateLimitMeter.Mark(int64(len(caps)))
 		}
@@ -1365,6 +1376,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			log.Trace("Removed old pending transaction", "hash", hash)
+			extdb.WritePendingTransaction(hash, nil, true, "deemed_too_old");
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
 		drops, invalids := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
@@ -1372,6 +1384,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			log.Trace("Removed unpayable pending transaction", "hash", hash)
 			pool.all.Remove(hash)
+			extdb.WritePendingTransaction(hash, nil, true, "low_balance_or_out_of_gas");
 		}
 		pool.priced.Removed(len(olds) + len(drops))
 		pendingNofundsMeter.Mark(int64(len(drops)))
@@ -1540,8 +1553,6 @@ func (t *txLookup) Add(tx *types.Transaction) {
 	defer t.lock.Unlock()
 
 	t.all[tx.Hash()] = tx
-
-	extdb.WritePendingTransaction(tx.Hash(), tx, false);
 }
 
 // Remove removes a transaction from the lookup.
@@ -1550,6 +1561,4 @@ func (t *txLookup) Remove(hash common.Hash) {
 	defer t.lock.Unlock()
 
 	delete(t.all, hash)
-
-	extdb.WritePendingTransaction(hash, nil, true);
 }
