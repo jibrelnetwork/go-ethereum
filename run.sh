@@ -6,12 +6,12 @@ geth version
 external_ip_option=""
 if [ ! -z ${GETIP} ]; then
     EXTERNAL_IP=$(wget -q -O - https://api.ipify.org)
-	if expr "$EXTERNAL_IP" : '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}$' >/dev/null; then 
-		echo "Using '${EXTERNAL_IP}' as an external IP address..."
-		external_ip_option="--nat extip:${EXTERNAL_IP}"
-	else
-		echo "Got wrong external IP address: '${EXTERNAL_IP}'. Ignoring."
-	fi
+    if expr "$EXTERNAL_IP" : '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}$' >/dev/null; then 
+        echo "Using '${EXTERNAL_IP}' as an external IP address..."
+        external_ip_option="--nat extip:${EXTERNAL_IP}"
+    else
+        echo "Got wrong external IP address: '${EXTERNAL_IP}'. Ignoring."
+    fi
 fi
 
 if [ -z "${POSTGRES_DB_HOST}" ] || [ -z "${POSTGRES_DB_USER}" ] || [ -z "${POSTGRES_DB_PASS}" ]; then
