@@ -36,5 +36,7 @@ else
     done
 fi
 
+if [ "$1" = "geth" ]; then shift 1; fi
+
 echo "Starting geth..."
 exec geth ${extdb_option} ${external_ip_option} "$@"
