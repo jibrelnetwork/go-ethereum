@@ -195,6 +195,71 @@ func get_ERC20_token_decimals_from_EVM(bc BlockChain, statedb *state.StateDB, bl
 	return decimals, nil
 }
 
+func get_ERC20_token_total_supply_from_EVM(bc BlockChain, statedb *state.StateDB, block *types.Block, contract_address *common.Address) (*big.Int, error) {
+	var (
+		err             error
+		input           []byte
+		erc20_token_abi abi.ABI
+	)
+
+	vm_config := vm.Config{
+		Debug: false,
+	}
+
+	erc20_token_abi, err = abi.JSON(strings.NewReader(erc20_token_abi_str))
+	bc_config := bc.Config()
+	value := big.NewInt(0)
+	gas_limit := uint64(50000000)
+	gas_price := big.NewInt(1)
+	fake_src_addr := common.HexToAddress("8999999999999999999999999999999999999998")
+	fake_balance := big.NewInt(0)
+	fake_balance.SetString("9999999999999999999999999999", 10)
+
+	// Add a fake account with huge balance so we have money to pay for gas to execute instructions on the EVM
+	statedb.AddBalance(fake_src_addr, fake_balance)
+
+	// Encode input for retrieving token balance
+	input, err = erc20_token_abi.Pack("totalSupply")
+	if err != nil {
+		extdb_common.Fatalf("Can't pack input for totalSupply: %v", err)
+	}
+
+	// Getting token totalSupply
+	msg := types.NewMessage(fake_src_addr, contract_address, 0, value, gas_limit, gas_price, input, false)
+	evm_context := token.NewEVMContext(msg, block.Header(), bc, nil)
+	evm := vm.NewEVM(evm_context, statedb, bc_config, vm_config)
+	gp := new(token.GasPool).AddGas(math.MaxUint64)
+
+	total_supply := big.NewInt(0)
+
+	ret, gas, failed, err := token.ApplyMessage(evm, msg, gp)
+	if failed {
+		log.Debug(fmt.Sprintf("get_ERC20_token_total_supply: vm err for symbol: %v, failed=%v", err, failed))
+		return total_supply, fmt.Errorf("vm err")
+	}
+
+	if err != nil {
+		log.Debug(fmt.Sprintf("get_ERC20_token_total_supply: getting 'balanceOf' caused error in vm: %v", err))
+		return total_supply, err
+	}
+
+	if len(ret) == 0 {
+		return total_supply, fmt.Errorf("len(ret)==0")
+	}
+
+	if !((err != nil) || (failed)) {
+		err = erc20_token_abi.Unpack(&total_supply, "totalSupply", ret)
+		if err != nil {
+			log.Warn("Can't upack totalSupply output from the EVM:", err)
+			total_supply.SetUint64(0)
+		}
+	}
+
+	_ = gas
+
+	return total_supply, nil
+}
+
 func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts types.Receipts) error {
 	blockchain_config := bc.Config()
 	statedb, err := bc.StateAt(block.Root())
@@ -216,6 +281,7 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 			tokenBalanceContract.BlockNumber = block.Number()
 			tokenBalanceContract.BlockHash = block.Hash()
 			tokenBalanceContract.TokenDecimals, err = get_ERC20_token_decimals_from_EVM(bc, statedb, block, &tokenBalanceContract.TokenAddress)
+			tokenBalanceContract.TokenTotalSupply, err = get_ERC20_token_total_supply_from_EVM(bc, statedb, block, &tokenBalanceContract.TokenAddress)
 			tokenBalanceContract.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceContract.TokenAddress, &tokenBalanceContract.HolderAddress)
 			if err == nil {
 				extdb.WriteTokenBalance(tokenBalanceContract)
@@ -231,6 +297,7 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 					tokenBalanceOwner.BlockNumber = block.Number()
 					tokenBalanceOwner.BlockHash = block.Hash()
 					tokenBalanceOwner.TokenDecimals = tokenBalanceContract.TokenDecimals
+					tokenBalanceOwner.TokenTotalSupply = tokenBalanceContract.TokenTotalSupply
 					tokenBalanceOwner.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceOwner.TokenAddress, &tokenBalanceOwner.HolderAddress)
 					if err == nil {
 						extdb.WriteTokenBalance(tokenBalanceOwner)
@@ -249,6 +316,7 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 				tokenBalanceFrom.BlockNumber = block.Number()
 				tokenBalanceFrom.BlockHash = event.BlockHash
 				tokenBalanceFrom.TokenDecimals, err = get_ERC20_token_decimals_from_EVM(bc, statedb, block, &tokenBalanceFrom.TokenAddress)
+				tokenBalanceFrom.TokenTotalSupply, err = get_ERC20_token_total_supply_from_EVM(bc, statedb, block, &tokenBalanceFrom.TokenAddress)
 				tokenBalanceFrom.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceFrom.TokenAddress, &tokenBalanceFrom.HolderAddress)
 				if err == nil {
 					extdb.WriteTokenBalance(tokenBalanceFrom)
@@ -260,6 +328,7 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 				tokenBalanceTo.BlockNumber = block.Number()
 				tokenBalanceTo.BlockHash = event.BlockHash
 				tokenBalanceTo.TokenDecimals = tokenBalanceFrom.TokenDecimals
+				tokenBalanceTo.TokenTotalSupply = tokenBalanceFrom.TokenTotalSupply
 				tokenBalanceTo.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress, &tokenBalanceTo.HolderAddress)
 				if err == nil {
 					extdb.WriteTokenBalance(tokenBalanceTo)
@@ -275,6 +344,7 @@ func WriteTokenBalances(extdb ExtDB, bc BlockChain, block *types.Block, receipts
 				tokenBalanceTo.BlockNumber = block.Number()
 				tokenBalanceTo.BlockHash = event.BlockHash
 				tokenBalanceTo.TokenDecimals, err = get_ERC20_token_decimals_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress)
+				tokenBalanceTo.TokenTotalSupply, err = get_ERC20_token_total_supply_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress)
 				tokenBalanceTo.HolderBalance, err = get_ERC20_token_balance_from_EVM(bc, statedb, block, &tokenBalanceTo.TokenAddress, &tokenBalanceTo.HolderAddress)
 				if err == nil {
 					extdb.WriteTokenBalance(tokenBalanceTo)
