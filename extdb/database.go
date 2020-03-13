@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"math/big"
 	"os"
 	"regexp"
 	"time"
@@ -364,6 +365,18 @@ func (self *ExtDBpg) WriteTokenBalance(tokenBalance *exttypes.TokenBalance) erro
 	if err != nil {
 		log.Warn("ExtDB Error writing token balance to extern DB", "Error", err)
 	}
+
+	if tokenBalance.TokenTotalSupply.Cmp(big.NewInt(0)) != 0 {
+		query = `INSERT INTO token_descriptions (block_number, block_hash, token, total_supply)
+					VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;`
+		_, err = self.exec(query, tokenBalance.BlockNumber.Uint64(), tokenBalance.BlockHash.Hex(),
+			tokenBalance.TokenAddress.Hex(), tokenBalance.TokenTotalSupply.String())
+
+		if err != nil {
+			log.Warn("ExtDB Error writing token description to extern DB", "Error", err)
+		}
+	}
+
 	return err
 }
 
