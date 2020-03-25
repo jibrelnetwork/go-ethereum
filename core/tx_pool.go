@@ -606,7 +606,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 			pool.all.Remove(old.Hash())
 			pool.priced.Removed(1)
 			pendingReplaceMeter.Mark(1)
-			extdb.WritePendingTransaction(tx.Hash(), nil, true, "replaced");
+			extdb.WritePendingTransaction(old.Hash(), nil, true, "replaced");
 		}
 		pool.all.Add(tx)
 		pool.priced.Put(tx)
